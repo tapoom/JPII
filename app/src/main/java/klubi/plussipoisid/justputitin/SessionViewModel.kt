@@ -20,6 +20,9 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val _sessions = MutableStateFlow<List<PuttSession>>(emptyList())
     val sessions: StateFlow<List<PuttSession>> = _sessions.asStateFlow()
 
+    private val _distances = MutableStateFlow<List<Int>>(emptyList())
+    val distances: StateFlow<List<Int>> = _distances.asStateFlow()
+
     fun setDistance(value: Int) {
         _distance.value = value
     }
@@ -49,6 +52,28 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         val db = PuttDatabase.getDatabase(getApplication())
         viewModelScope.launch {
             _sessions.value = db.puttSessionDao().getSessionsByDistance(distance).take(10)
+        }
+    }
+
+    fun loadDistances() {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            _distances.value = db.puttSessionDao().getAllSessions().map { it.distance }.distinct().sorted()
+        }
+    }
+
+    fun loadSessionsForDistanceAndRange(distance: Int, range: String) {
+        val db = PuttDatabase.getDatabase(getApplication())
+        val now = System.currentTimeMillis()
+        viewModelScope.launch {
+            val all = db.puttSessionDao().getSessionsByDistance(distance)
+            val filtered = when (range) {
+                "Last week" -> all.filter { it.date >= now - 7 * 24 * 60 * 60 * 1000L }
+                "Last month" -> all.filter { it.date >= now - 30 * 24 * 60 * 60 * 1000L }
+                "Last year" -> all.filter { it.date >= now - 365 * 24 * 60 * 60 * 1000L }
+                else -> all
+            }
+            _sessions.value = filtered.take(10)
         }
     }
 } 
