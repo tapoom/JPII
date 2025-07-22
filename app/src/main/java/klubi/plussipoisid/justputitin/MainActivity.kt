@@ -25,7 +25,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -55,10 +55,11 @@ import java.util.Date
 import java.util.Locale
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.ui.draw.scale
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,37 +77,55 @@ class MainActivity : ComponentActivity() {
 fun AppNavHost() {
     val navController = rememberNavController()
     val viewModel: SessionViewModel = viewModel()
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = "main_menu",
-            modifier = Modifier.fillMaxSize()
-        ) {
-            composable("main_menu") {
-                MainMenuScreen(
-                    onStartSession = { navController.navigate("session_setup") },
-                    onCheckStats = { navController.navigate("statistics") }
-                )
+    val currentScreen = remember { mutableStateOf("main_menu") }
+    NavHost(
+        navController = navController,
+        startDestination = "main_menu",
+        modifier = Modifier.fillMaxSize()
+    ) {
+        composable("main_menu") {
+            currentScreen.value = "main_menu"
+            Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+                AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
+                    MainMenuScreen(
+                        onStartSession = { navController.navigate("session_setup") },
+                        onCheckStats = { navController.navigate("statistics") }
+                    )
+                }
             }
-            composable("session_setup") {
-                SessionSetupScreen(onStartSession = { distance, numPutts, style ->
-                    navController.navigate("result_entry/$distance/$numPutts/$style")
-                })
+        }
+        composable("session_setup") {
+            currentScreen.value = "session_setup"
+            Surface(color = MaterialTheme.colorScheme.surfaceVariant, tonalElevation = 4.dp) {
+                AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
+                    SessionSetupScreen(onStartSession = { distance, numPutts, style ->
+                        navController.navigate("result_entry/$distance/$numPutts/$style")
+                    })
+                }
             }
-            composable("statistics") {
-                // TODO: Implement statistics screen
-                StatisticsScreen()
+        }
+        composable("statistics") {
+            currentScreen.value = "statistics"
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, tonalElevation = 2.dp) {
+                AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
+                    StatisticsScreen()
+                }
             }
-            composable("result_entry/{distance}/{numPutts}/{style}") { backStackEntry ->
-                val distance = backStackEntry.arguments?.getString("distance")?.toIntOrNull() ?: 0
-                val numPutts = backStackEntry.arguments?.getString("numPutts")?.toIntOrNull() ?: 0
-                val style = backStackEntry.arguments?.getString("style") ?: viewModel.styles[0]
-                ResultEntryScreen(distance = distance, numPutts = numPutts,
-                    onRepeat = { navController.navigate("result_entry/$distance/$numPutts/$style") },
-                    onAdjust = { navController.popBackStack("session_setup", inclusive = false) },
-                    navController = navController,
-                    style = style
-                )
+        }
+        composable("result_entry/{distance}/{numPutts}/{style}") { backStackEntry ->
+            currentScreen.value = "result_entry"
+            val distance = backStackEntry.arguments?.getString("distance")?.toIntOrNull() ?: 0
+            val numPutts = backStackEntry.arguments?.getString("numPutts")?.toIntOrNull() ?: 0
+            val style = backStackEntry.arguments?.getString("style") ?: viewModel.styles[0]
+            Surface(color = MaterialTheme.colorScheme.primaryContainer, tonalElevation = 8.dp) {
+                AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
+                    ResultEntryScreen(distance = distance, numPutts = numPutts,
+                        onRepeat = { navController.navigate("result_entry/$distance/$numPutts/$style") },
+                        onAdjust = { navController.popBackStack("session_setup", inclusive = false) },
+                        navController = navController,
+                        style = style
+                    )
+                }
             }
         }
     }
@@ -121,13 +140,13 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Disc Golf Putting Tracker", modifier = Modifier.padding(bottom = 32.dp))
+        Text("Just put it in!", modifier = Modifier.padding(bottom = 32.dp))
         Button(onClick = onStartSession, modifier = Modifier.fillMaxWidth()) {
-            Text("Start New Putting Session")
+            Text("New session")
         }
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = onCheckStats, modifier = Modifier.fillMaxWidth()) {
-            Text("Check Historical Statistics")
+            Text("History")
         }
     }
 }
@@ -311,10 +330,7 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
     var successful = remember(numPutts) { mutableStateOf(numPutts) }
     val hitRate = if (numPutts > 0) (successful.value * 100 / numPutts) else 0
     var saved = remember { mutableStateOf(false) }
-    val styles = viewModel.styles
     val selectedStyle = remember { mutableStateOf(style) }
-    val expandedStyle = remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
 
     // Intercept system back and go to main menu
     BackHandler {
@@ -351,7 +367,7 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "\uD83C\uDFBE Enter Session Results",
+                    text = "Enter Session Results",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(bottom = 16.dp),
                     textAlign = TextAlign.Center
@@ -359,33 +375,13 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                 Text("Distance: $distance meters", style = MaterialTheme.typography.bodyLarge)
                 Text("Throws: $numPutts", style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Select Putting Style", style = MaterialTheme.typography.bodyLarge)
-                Box {
-                    Button(
-                        onClick = { expandedStyle.value = true },
-                        modifier = Modifier.fillMaxWidth(0.7f)
-                    ) {
-                        Text(selectedStyle.value)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Pick Style")
-                    }
-                    DropdownMenu(
-                        expanded = expandedStyle.value,
-                        onDismissRequest = { expandedStyle.value = false },
-                        modifier = Modifier.fillMaxWidth(0.7f)
-                    ) {
-                        styles.forEach { style ->
-                            DropdownMenuItem(
-                                text = { Text(style) },
-                                onClick = {
-                                    selectedStyle.value = style
-                                    expandedStyle.value = false
-                                }
-                            )
-                        }
-                    }
-                }
+
+                Text("Style: " + selectedStyle.value, style = MaterialTheme.typography.bodyMedium)
+
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Successful Putts", style = MaterialTheme.typography.bodyLarge)
+
+                Text("Successful Putts", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                Spacer(modifier = Modifier.height(8.dp))
                 NumberPickerRow(
                     range = 0..numPutts,
                     selected = successful.value,
@@ -487,7 +483,7 @@ fun SessionSetupScreen(onStartSession: (Int, Int, String) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "\uD83C\uDFBE New Putting Session",
+                    text = "Setup Putting Session",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(bottom = 16.dp),
                     textAlign = TextAlign.Center

@@ -36,7 +36,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         "Scoober or Overhand Putt",
         "Straddle Jump Putt"
     )
-    private val _selectedStyle = MutableStateFlow(styles[0])
+    private val _selectedStyle = MutableStateFlow(styles[1])
     val selectedStyle: StateFlow<String> = _selectedStyle.asStateFlow()
     fun setStyle(style: String) { _selectedStyle.value = style }
 
