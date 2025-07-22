@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -27,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,6 +54,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.scale
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -300,12 +308,13 @@ fun BarChart(sessions: List<PuttSession>) {
 @Composable
 fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdjust: () -> Unit, navController: androidx.navigation.NavHostController, style: String) {
     val viewModel: SessionViewModel = viewModel()
-    var successful = remember { mutableStateOf(0) }
+    var successful = remember(numPutts) { mutableStateOf(numPutts) }
     val hitRate = if (numPutts > 0) (successful.value * 100 / numPutts) else 0
     var saved = remember { mutableStateOf(false) }
     val styles = viewModel.styles
     val selectedStyle = remember { mutableStateOf(style) }
     val expandedStyle = remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     // Intercept system back and go to main menu
     BackHandler {
@@ -384,32 +393,56 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Hit Rate: $hitRate%", modifier = Modifier.padding(bottom = 24.dp), style = MaterialTheme.typography.bodyLarge)
-                Button(
-                    onClick = {
-                        viewModel.saveSession(distance, numPutts, successful.value, selectedStyle.value)
-                        saved.value = true
-                    },
-                    enabled = successful.value in 0..numPutts && !saved.value,
-                    modifier = Modifier.fillMaxWidth(0.7f)
-                ) {
-                    Text("Save Results")
+                // Animated Save Button
+                val buttonColor by animateColorAsState(
+                    targetValue = if (saved.value) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+                    animationSpec = tween(durationMillis = 400), label = ""
+                )
+                val shadowColor by animateColorAsState(
+                    targetValue = if (saved.value) Color(0x804CAF50) else Color.Transparent,
+                    animationSpec = tween(durationMillis = 400), label = ""
+                )
+                Box(contentAlignment = Alignment.Center) {
+                    Button(
+                        onClick = {
+                            viewModel.saveSession(distance, numPutts, successful.value, selectedStyle.value)
+                            saved.value = true
+                            successful.value = numPutts
+                        },
+                        enabled = successful.value in 0..numPutts && !saved.value,
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(56.dp)
+                            .shadow(
+                                elevation = if (saved.value) 24.dp else 4.dp,
+                                shape = CircleShape,
+                                ambientColor = shadowColor,
+                                spotColor = shadowColor
+                            )
+                    ) {
+                        Crossfade(targetState = saved.value, label = "") { isSaved ->
+                            if (isSaved) {
+                                Icon(Icons.Default.Check, contentDescription = "Saved", tint = Color.White)
+                            } else {
+                                Text("Save", color = Color.White)
+                            }
+                        }
+                    }
                 }
                 if (saved.value) {
-                    Text("Session saved!", modifier = Modifier.padding(top = 16.dp))
-                    Button(onClick = onRepeat, modifier = Modifier.padding(top = 16.dp)) {
-                        Text("Repeat Session")
+                    // Reset saved state after a short delay or on next input
+                    LaunchedEffect(saved.value) {
+                        if (saved.value) {
+                            kotlinx.coroutines.delay(1200)
+                            saved.value = false
+                        }
                     }
-                    Button(onClick = onAdjust, modifier = Modifier.padding(top = 16.dp)) {
-                        Text("Adjust Session Settings")
-                    }
-                } else {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = onRepeat, enabled = false) {
-                        Text("Repeat Session")
-                    }
-                    Button(onClick = onAdjust, enabled = false) {
-                        Text("Adjust Session Settings")
-                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = onAdjust) {
+                    Text("Adjust Session Settings")
                 }
             }
         }
@@ -518,7 +551,23 @@ fun NumberPickerRow(range: IntRange, selected: Int?, onSelected: (Int) -> Unit) 
     val itemSize = 56.dp
     val selectedItemSize = 72.dp
     val contentPadding = (itemSize / 2)
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
+    // Scroll to selected on first show and whenever selected changes
+    LaunchedEffect(selected) {
+        if (selected != null) {
+            val idx = range.indexOf(selected)
+            if (idx >= 0) {
+                coroutineScope.launch {
+                    listState.animateScrollToItem(idx)
+                }
+            }
+        }
+    }
+
     LazyRow(
+        state = listState,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(horizontal = contentPadding),
         modifier = Modifier
