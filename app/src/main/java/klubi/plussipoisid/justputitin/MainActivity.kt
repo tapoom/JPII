@@ -64,6 +64,9 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.graphics.Brush
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -465,9 +468,15 @@ fun SessionSetupScreen(onStartSession: (Int, Int) -> Unit) {
 
 @Composable
 fun NumberPickerRow(range: IntRange, selected: Int, onSelected: (Int) -> Unit) {
+    val itemSize = 56.dp
+    val selectedItemSize = 72.dp
+    val visibleItems = 4 // Number of items to show at once (including partials)
+    val contentPadding = (itemSize / 2)
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(horizontal = 24.dp)
+        contentPadding = PaddingValues(horizontal = contentPadding),
+        modifier = Modifier
+            .fillMaxWidth()
     ) {
         items(range.toList()) { value ->
             val isSelected = value == selected
@@ -484,7 +493,7 @@ fun NumberPickerRow(range: IntRange, selected: Int, onSelected: (Int) -> Unit) {
                 colors = CardDefaults.cardColors(containerColor = animatedColor),
                 elevation = CardDefaults.cardElevation(defaultElevation = animatedElevation),
                 modifier = Modifier
-                    .size(if (isSelected) 64.dp else 48.dp)
+                    .size(if (isSelected) selectedItemSize else itemSize)
                     .shadow(if (isSelected) 12.dp else 2.dp, CircleShape)
                     .clickable { onSelected(value) }
             ) {

@@ -11,5 +11,6 @@ data class PuttSession(
     val distance: Int,
     val numPutts: Int,
     val madePutts: Int,
-    val missedPutts: Int
+    val missedPutts: Int,
+    val style: String = ""
 ) 
