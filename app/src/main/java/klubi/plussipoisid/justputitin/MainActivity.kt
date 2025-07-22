@@ -7,7 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,11 +21,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
@@ -40,12 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -59,14 +50,7 @@ import klubi.plussipoisid.justputitin.ui.theme.JPIITheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.graphics.Brush
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,6 +67,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavHost() {
     val navController = rememberNavController()
+    val viewModel: SessionViewModel = viewModel()
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         NavHost(
             navController = navController,
@@ -96,21 +81,23 @@ fun AppNavHost() {
                 )
             }
             composable("session_setup") {
-                SessionSetupScreen(onStartSession = { distance, numPutts ->
-                    navController.navigate("result_entry/$distance/$numPutts")
+                SessionSetupScreen(onStartSession = { distance, numPutts, style ->
+                    navController.navigate("result_entry/$distance/$numPutts/$style")
                 })
             }
             composable("statistics") {
                 // TODO: Implement statistics screen
                 StatisticsScreen()
             }
-            composable("result_entry/{distance}/{numPutts}") { backStackEntry ->
+            composable("result_entry/{distance}/{numPutts}/{style}") { backStackEntry ->
                 val distance = backStackEntry.arguments?.getString("distance")?.toIntOrNull() ?: 0
                 val numPutts = backStackEntry.arguments?.getString("numPutts")?.toIntOrNull() ?: 0
+                val style = backStackEntry.arguments?.getString("style") ?: viewModel.styles[0]
                 ResultEntryScreen(distance = distance, numPutts = numPutts,
-                    onRepeat = { navController.navigate("result_entry/$distance/$numPutts") },
+                    onRepeat = { navController.navigate("result_entry/$distance/$numPutts/$style") },
                     onAdjust = { navController.popBackStack("session_setup", inclusive = false) },
-                    navController = navController
+                    navController = navController,
+                    style = style
                 )
             }
         }
@@ -243,6 +230,7 @@ fun StatisticsScreen() {
                     Text("Throws: ${lastSession.numPutts}")
                     Text("Hits: ${lastSession.madePutts}")
                     Text("Hit Rate: $hitRate%", fontWeight = FontWeight.Bold)
+                    Text("Style: ${lastSession.style}")
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
@@ -268,6 +256,7 @@ fun StatisticsScreen() {
                                 Text("$date", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                 Text("Throws: ${session.numPutts}")
                                 Text("Hits: ${session.madePutts}")
+                                Text("Style: ${session.style}")
                             }
                             Text("$hitRate%", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.align(Alignment.CenterVertically))
                         }
@@ -309,11 +298,14 @@ fun BarChart(sessions: List<PuttSession>) {
 }
 
 @Composable
-fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdjust: () -> Unit, navController: androidx.navigation.NavHostController) {
+fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdjust: () -> Unit, navController: androidx.navigation.NavHostController, style: String) {
     val viewModel: SessionViewModel = viewModel()
     var successful = remember { mutableStateOf(0) }
     val hitRate = if (numPutts > 0) (successful.value * 100 / numPutts) else 0
     var saved = remember { mutableStateOf(false) }
+    val styles = viewModel.styles
+    val selectedStyle = remember { mutableStateOf(style) }
+    val expandedStyle = remember { mutableStateOf(false) }
 
     // Intercept system back and go to main menu
     BackHandler {
@@ -358,6 +350,32 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                 Text("Distance: $distance meters", style = MaterialTheme.typography.bodyLarge)
                 Text("Throws: $numPutts", style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(16.dp))
+                Text("Select Putting Style", style = MaterialTheme.typography.bodyLarge)
+                Box {
+                    Button(
+                        onClick = { expandedStyle.value = true },
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    ) {
+                        Text(selectedStyle.value)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Pick Style")
+                    }
+                    DropdownMenu(
+                        expanded = expandedStyle.value,
+                        onDismissRequest = { expandedStyle.value = false },
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    ) {
+                        styles.forEach { style ->
+                            DropdownMenuItem(
+                                text = { Text(style) },
+                                onClick = {
+                                    selectedStyle.value = style
+                                    expandedStyle.value = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
                 Text("Successful Putts", style = MaterialTheme.typography.bodyLarge)
                 NumberPickerRow(
                     range = 0..numPutts,
@@ -368,7 +386,7 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                 Text("Hit Rate: $hitRate%", modifier = Modifier.padding(bottom = 24.dp), style = MaterialTheme.typography.bodyLarge)
                 Button(
                     onClick = {
-                        viewModel.saveSession(distance, numPutts, successful.value)
+                        viewModel.saveSession(distance, numPutts, successful.value, selectedStyle.value)
                         saved.value = true
                     },
                     enabled = successful.value in 0..numPutts && !saved.value,
@@ -399,10 +417,13 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
 }
 
 @Composable
-fun SessionSetupScreen(onStartSession: (Int, Int) -> Unit) {
+fun SessionSetupScreen(onStartSession: (Int, Int, String) -> Unit) {
     val viewModel: SessionViewModel = viewModel()
     val distance = viewModel.distance.collectAsState().value
     val numPutts = viewModel.numPutts.collectAsState().value
+    val styles = viewModel.styles
+    val selectedStyle = viewModel.selectedStyle.collectAsState().value
+    val expandedStyle = remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -442,7 +463,7 @@ fun SessionSetupScreen(onStartSession: (Int, Int) -> Unit) {
                 Spacer(modifier = Modifier.height(8.dp))
                 NumberPickerRow(
                     range = 1..30,
-                    selected = distance.takeIf { it in 1..30 } ?: 4,
+                    selected = if (distance in 1..30) distance else null,
                     onSelected = { viewModel.setDistance(it) }
                 )
                 Spacer(modifier = Modifier.height(24.dp))
@@ -450,12 +471,38 @@ fun SessionSetupScreen(onStartSession: (Int, Int) -> Unit) {
                 Spacer(modifier = Modifier.height(8.dp))
                 NumberPickerRow(
                     range = 1..20,
-                    selected = numPutts.takeIf { it in 1..20 } ?: 10,
+                    selected = if (numPutts in 1..20) numPutts else null,
                     onSelected = { viewModel.setNumPutts(it) }
                 )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text("Select Putting Style", style = MaterialTheme.typography.bodyLarge)
+                Box {
+                    Button(
+                        onClick = { expandedStyle.value = true },
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    ) {
+                        Text(selectedStyle)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Pick Style")
+                    }
+                    DropdownMenu(
+                        expanded = expandedStyle.value,
+                        onDismissRequest = { expandedStyle.value = false },
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    ) {
+                        styles.forEach { style ->
+                            DropdownMenuItem(
+                                text = { Text(style) },
+                                onClick = {
+                                    viewModel.setStyle(style)
+                                    expandedStyle.value = false
+                                }
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(32.dp))
                 Button(
-                    onClick = { viewModel.startSession(onStartSession) },
+                    onClick = { viewModel.startSession { d, n -> onStartSession(d, n, selectedStyle) } },
                     enabled = distance in 1..30 && numPutts in 1..20,
                     modifier = Modifier.fillMaxWidth(0.7f)
                 ) {
@@ -467,10 +514,9 @@ fun SessionSetupScreen(onStartSession: (Int, Int) -> Unit) {
 }
 
 @Composable
-fun NumberPickerRow(range: IntRange, selected: Int, onSelected: (Int) -> Unit) {
+fun NumberPickerRow(range: IntRange, selected: Int?, onSelected: (Int) -> Unit) {
     val itemSize = 56.dp
     val selectedItemSize = 72.dp
-    val visibleItems = 4 // Number of items to show at once (including partials)
     val contentPadding = (itemSize / 2)
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -479,7 +525,7 @@ fun NumberPickerRow(range: IntRange, selected: Int, onSelected: (Int) -> Unit) {
             .fillMaxWidth()
     ) {
         items(range.toList()) { value ->
-            val isSelected = value == selected
+            val isSelected = selected != null && value == selected
             val animatedColor by animateColorAsState(
                 targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.LightGray,
                 animationSpec = tween(durationMillis = 300), label = ""

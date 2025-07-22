@@ -23,6 +23,23 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val _distances = MutableStateFlow<List<Int>>(emptyList())
     val distances: StateFlow<List<Int>> = _distances.asStateFlow()
 
+    val styles = listOf(
+        "Push Putt (Spin-Push Hybrid)",
+        "Spin Putt",
+        "Push-Putt (Traditional)",
+        "Spush Putt (Spin + Push Hybrid)",
+        "Turbo Putt",
+        "Straddle Putt",
+        "Staggered Stance Putt",
+        "Jump Putt",
+        "Step Putt",
+        "Scoober or Overhand Putt",
+        "Straddle Jump Putt"
+    )
+    private val _selectedStyle = MutableStateFlow(styles[0])
+    val selectedStyle: StateFlow<String> = _selectedStyle.asStateFlow()
+    fun setStyle(style: String) { _selectedStyle.value = style }
+
     fun setDistance(value: Int) {
         _distance.value = value
     }
@@ -35,13 +52,14 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         onStarted(_distance.value, _numPutts.value)
     }
 
-    fun saveSession(distance: Int, numPutts: Int, madePutts: Int) {
+    fun saveSession(distance: Int, numPutts: Int, madePutts: Int, style: String = styles[0]) {
         val db = PuttDatabase.getDatabase(getApplication())
         val session = PuttSession(
             distance = distance,
             numPutts = numPutts,
             madePutts = madePutts,
-            missedPutts = numPutts - madePutts
+            missedPutts = numPutts - madePutts,
+            style = style
         )
         viewModelScope.launch {
             db.puttSessionDao().insertSession(session)
