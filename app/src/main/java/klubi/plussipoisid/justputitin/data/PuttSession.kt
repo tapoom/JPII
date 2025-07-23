@@ -2,7 +2,6 @@ package klubi.plussipoisid.justputitin.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import java.util.Date
 
 @Entity(tableName = "putt_sessions")
 data class PuttSession(
