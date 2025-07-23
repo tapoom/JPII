@@ -66,6 +66,7 @@ import android.media.MediaPlayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.painterResource
 
 
 @Composable
@@ -173,9 +174,17 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrend
         modifier = Modifier
             .fillMaxSize()
             .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Icon(
+            painter = painterResource(id = R.drawable.jpii_foreground),
+            contentDescription = "App Icon",
+            modifier = Modifier
+                .size(260.dp)
+                .padding(top = 16.dp, bottom = 16.dp),
+            tint = Color.Unspecified
+        )
         Text("Putting Rating: $puttingRating", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 16.dp))
         Text("Just put it in!", modifier = Modifier.padding(bottom = 32.dp))
         Button(onClick = onStartSession, modifier = Modifier.fillMaxWidth()) {
