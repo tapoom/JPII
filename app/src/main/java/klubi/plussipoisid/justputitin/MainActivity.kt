@@ -145,6 +145,11 @@ fun AppNavHost() {
 
 @Composable
 fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrends: () -> Unit) {
+    val viewModel: SessionViewModel = viewModel()
+    val puttingRating by viewModel.puttingRating.collectAsState()
+    LaunchedEffect(Unit) {
+        viewModel.loadPuttingRating()
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -152,6 +157,7 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrend
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text("Putting Rating: $puttingRating", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 16.dp))
         Text("Just put it in!", modifier = Modifier.padding(bottom = 32.dp))
         Button(onClick = onStartSession, modifier = Modifier.fillMaxWidth()) {
             Text("New session")
