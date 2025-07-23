@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -63,6 +64,24 @@ import androidx.compose.animation.fadeOut
 import klubi.plussipoisid.justputitin.ui.TrendsScreen
 import android.media.MediaPlayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.alpha
+
+
+@Composable
+fun FadingAppNavHost() {
+    var visible by remember { mutableStateOf(false) }
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 2000)
+    )
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+    Box(modifier = Modifier.fillMaxSize().alpha(alpha)) {
+        AppNavHost()
+    }
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,7 +89,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             JPIITheme {
-                AppNavHost()
+                FadingAppNavHost()
             }
         }
     }
