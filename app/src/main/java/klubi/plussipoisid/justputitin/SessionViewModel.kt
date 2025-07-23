@@ -43,6 +43,11 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     val selectedStyle: StateFlow<String> = _selectedStyle.asStateFlow()
     fun setStyle(style: String) { _selectedStyle.value = style }
 
+    // Sound effects toggle
+    private val _soundOn = MutableStateFlow(true)
+    val soundOn: StateFlow<Boolean> = _soundOn.asStateFlow()
+    fun setSoundOn(enabled: Boolean) { _soundOn.value = enabled }
+
     fun setDistance(value: Int) {
         _distance.value = value
     }

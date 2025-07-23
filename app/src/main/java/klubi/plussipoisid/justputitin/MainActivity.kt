@@ -388,6 +388,7 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
     var saved = remember { mutableStateOf(false) }
     val selectedStyle = remember { mutableStateOf(style) }
     val context = LocalContext.current
+    val soundOn by viewModel.soundOn.collectAsState()
 
     // Intercept system back and go to main menu
     BackHandler {
@@ -461,7 +462,7 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                             val puttsMade = successful.value
                             viewModel.saveSession(distance, numPutts, puttsMade, selectedStyle.value)
                             saved.value = true
-                            if (puttsMade == numPutts && numPutts > 0) {
+                            if (puttsMade == numPutts && numPutts > 0 && soundOn) {
                                 playKawaiiSound(context)
                             }
                             successful.value = numPutts
@@ -496,6 +497,17 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                             saved.value = false
                         }
                     }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Sound effects toggle
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sound effects", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    androidx.compose.material3.Switch(
+                        checked = soundOn,
+                        onCheckedChange = { viewModel.setSoundOn(it) }
+                    )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = onAdjust) {
