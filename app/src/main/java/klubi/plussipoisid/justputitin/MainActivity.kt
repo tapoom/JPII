@@ -214,12 +214,16 @@ fun StatisticsScreen() {
     val selectedDistance = remember { mutableStateOf<Int?>(null) }
     val selectedRange = remember { mutableStateOf(historyOptions[0]) }
     val selectedStyle = remember { mutableStateOf("All") }
+    val averageHitRate = viewModel.averageHitRate.collectAsState().value
 
     LaunchedEffect(Unit) {
         viewModel.loadDistances()
     }
     LaunchedEffect(selectedDistance.value) {
-        selectedDistance.value?.let { viewModel.loadStylesForDistance(it) }
+        selectedDistance.value?.let {
+            viewModel.loadStylesForDistance(it)
+            viewModel.loadAverageHitRate(it)
+        }
     }
     LaunchedEffect(selectedDistance.value, selectedStyle.value, selectedRange.value) {
         selectedDistance.value?.let { viewModel.loadSessionsForDistanceAndStyle(it, if (selectedStyle.value == "All") null else selectedStyle.value, selectedRange.value) }
@@ -269,6 +273,13 @@ fun StatisticsScreen() {
                         )
                     }
                 }
+            }
+            if (averageHitRate != null && selectedDistance.value != null) {
+                Text(
+                    text = "Average hit rate for ${selectedDistance.value}m: ${(averageHitRate * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
             Box {
@@ -572,6 +583,13 @@ fun SessionSetupScreen(onStartSession: (Int, Int, String) -> Unit) {
     val styles = viewModel.styles
     val selectedStyle = viewModel.selectedStyle.collectAsState().value
     val expandedStyle = remember { mutableStateOf(false) }
+    val averageHitRate = viewModel.averageHitRate.collectAsState().value
+
+    LaunchedEffect(distance) {
+        if (distance in 1..30) {
+            viewModel.loadAverageHitRate(distance)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -614,6 +632,19 @@ fun SessionSetupScreen(onStartSession: (Int, Int, String) -> Unit) {
                     selected = if (distance in 1..30) distance else null,
                     onSelected = { viewModel.setDistance(it) }
                 )
+                if (averageHitRate != null && distance in 1..30) {
+                    Text(
+                        text = "Average hit rate for ${distance}m: ${(averageHitRate * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                    )
+                } else if (distance in 1..30) {
+                    Text(
+                        text = "No sessions recorded",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Select Number of Putts", style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(8.dp))

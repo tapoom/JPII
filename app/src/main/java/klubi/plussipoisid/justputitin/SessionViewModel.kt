@@ -51,6 +51,23 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     val soundOn: StateFlow<Boolean> = _soundOn.asStateFlow()
     fun setSoundOn(enabled: Boolean) { _soundOn.value = enabled }
 
+    // Average hit rate for selected distance
+    private val _averageHitRate = MutableStateFlow<Double?>(null)
+    val averageHitRate: StateFlow<Double?> = _averageHitRate.asStateFlow()
+    fun loadAverageHitRate(distance: Int) {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            val sessions = db.puttSessionDao().getAtLeastTenSessionsByDistance(distance)
+            if (sessions.isNotEmpty()) {
+                val totalPutts = sessions.sumOf { it.numPutts }
+                val totalMade = sessions.sumOf { it.madePutts }
+                _averageHitRate.value = if (totalPutts > 0) totalMade.toDouble() / totalPutts else null
+            } else {
+                _averageHitRate.value = null
+            }
+        }
+    }
+
     // Putting rating state
     private val _puttingRating = MutableStateFlow(0)
     val puttingRating: StateFlow<Int> = _puttingRating.asStateFlow()
