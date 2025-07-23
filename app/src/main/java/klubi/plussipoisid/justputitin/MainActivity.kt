@@ -60,6 +60,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import klubi.plussipoisid.justputitin.ui.TrendsScreen
+import android.media.MediaPlayer
+import androidx.compose.ui.platform.LocalContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,7 +92,8 @@ fun AppNavHost() {
                 AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
                     MainMenuScreen(
                         onStartSession = { navController.navigate("session_setup") },
-                        onCheckStats = { navController.navigate("statistics") }
+                        onCheckStats = { navController.navigate("statistics") },
+                        onTrends = { navController.navigate("trends") }
                     )
                 }
             }
@@ -109,6 +113,14 @@ fun AppNavHost() {
             Surface(color = MaterialTheme.colorScheme.secondaryContainer, tonalElevation = 2.dp) {
                 AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
                     StatisticsScreen()
+                }
+            }
+        }
+        composable("trends") {
+            currentScreen.value = "trends"
+            Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+                AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
+                    TrendsScreen()
                 }
             }
         }
@@ -132,7 +144,7 @@ fun AppNavHost() {
 }
 
 @Composable
-fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit) {
+fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrends: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -147,6 +159,10 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = onCheckStats, modifier = Modifier.fillMaxWidth()) {
             Text("History")
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onTrends, modifier = Modifier.fillMaxWidth()) {
+            Text("Line Trends")
         }
     }
 }
@@ -371,6 +387,8 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
     val hitRate = if (numPutts > 0) (successful.value * 100 / numPutts) else 0
     var saved = remember { mutableStateOf(false) }
     val selectedStyle = remember { mutableStateOf(style) }
+    val context = LocalContext.current
+    val soundOn by viewModel.soundOn.collectAsState()
 
     // Intercept system back and go to main menu
     BackHandler {
@@ -441,8 +459,12 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                 Box(contentAlignment = Alignment.Center) {
                     Button(
                         onClick = {
-                            viewModel.saveSession(distance, numPutts, successful.value, selectedStyle.value)
+                            val puttsMade = successful.value
+                            viewModel.saveSession(distance, numPutts, puttsMade, selectedStyle.value)
                             saved.value = true
+                            if (puttsMade == numPutts && numPutts > 0 && soundOn) {
+                                playKawaiiSound(context)
+                            }
                             successful.value = numPutts
                         },
                         enabled = successful.value in 0..numPutts && !saved.value,
@@ -477,11 +499,34 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Sound effects toggle
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sound effects", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    androidx.compose.material3.Switch(
+                        checked = soundOn,
+                        onCheckedChange = { viewModel.setSoundOn(it) }
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = onAdjust) {
                     Text("Adjust Session Settings")
                 }
             }
         }
+    }
+}
+
+fun playKawaiiSound(context: android.content.Context) {
+    try {
+        val mediaPlayer = MediaPlayer.create(context, R.raw.kawaii)
+        mediaPlayer?.setOnCompletionListener { mp ->
+            mp.release()
+        }
+        mediaPlayer?.start()
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }
 
