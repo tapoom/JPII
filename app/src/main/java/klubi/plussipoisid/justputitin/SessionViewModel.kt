@@ -72,7 +72,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     fun loadSessionsForDistance(distance: Int) {
         val db = PuttDatabase.getDatabase(getApplication())
         viewModelScope.launch {
-            _sessions.value = db.puttSessionDao().getSessionsByDistance(distance).take(10)
+            _sessions.value = db.puttSessionDao().getSessionsByDistance(distance)
         }
     }
 
@@ -101,7 +101,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 "Last year" -> all.filter { it.date >= now - 365 * 24 * 60 * 60 * 1000L }
                 else -> all
             }
-            _sessions.value = filtered.take(10)
+            _sessions.value = filtered
         }
     }
 
@@ -117,7 +117,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 "Last year" -> filteredByStyle.filter { it.date >= now - 365 * 24 * 60 * 60 * 1000L }
                 else -> filteredByStyle
             }
-            _sessions.value = filtered.take(10)
+            _sessions.value = filtered
         }
     }
 } 

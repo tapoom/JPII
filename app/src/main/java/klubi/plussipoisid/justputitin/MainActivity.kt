@@ -60,6 +60,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import klubi.plussipoisid.justputitin.ui.TrendsScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,7 +90,8 @@ fun AppNavHost() {
                 AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
                     MainMenuScreen(
                         onStartSession = { navController.navigate("session_setup") },
-                        onCheckStats = { navController.navigate("statistics") }
+                        onCheckStats = { navController.navigate("statistics") },
+                        onTrends = { navController.navigate("trends") }
                     )
                 }
             }
@@ -109,6 +111,14 @@ fun AppNavHost() {
             Surface(color = MaterialTheme.colorScheme.secondaryContainer, tonalElevation = 2.dp) {
                 AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
                     StatisticsScreen()
+                }
+            }
+        }
+        composable("trends") {
+            currentScreen.value = "trends"
+            Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+                AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
+                    TrendsScreen()
                 }
             }
         }
@@ -132,7 +142,7 @@ fun AppNavHost() {
 }
 
 @Composable
-fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit) {
+fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrends: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -147,6 +157,10 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = onCheckStats, modifier = Modifier.fillMaxWidth()) {
             Text("History")
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onTrends, modifier = Modifier.fillMaxWidth()) {
+            Text("Line Trends")
         }
     }
 }
