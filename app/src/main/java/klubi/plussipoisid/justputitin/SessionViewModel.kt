@@ -23,6 +23,9 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val _distances = MutableStateFlow<List<Int>>(emptyList())
     val distances: StateFlow<List<Int>> = _distances.asStateFlow()
 
+    private val _stylesForDistance = MutableStateFlow<List<String>>(emptyList())
+    val stylesForDistance: StateFlow<List<String>> = _stylesForDistance.asStateFlow()
+
     val styles = listOf(
         "Push Putt (Spin-Push Hybrid)",
         "Spin Putt",
@@ -80,6 +83,13 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun loadStylesForDistance(distance: Int) {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            _stylesForDistance.value = db.puttSessionDao().getSessionsByDistance(distance).map { it.style }.distinct().sorted()
+        }
+    }
+
     fun loadSessionsForDistanceAndRange(distance: Int, range: String) {
         val db = PuttDatabase.getDatabase(getApplication())
         val now = System.currentTimeMillis()
@@ -90,6 +100,22 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 "Last month" -> all.filter { it.date >= now - 30 * 24 * 60 * 60 * 1000L }
                 "Last year" -> all.filter { it.date >= now - 365 * 24 * 60 * 60 * 1000L }
                 else -> all
+            }
+            _sessions.value = filtered.take(10)
+        }
+    }
+
+    fun loadSessionsForDistanceAndStyle(distance: Int, style: String?, range: String) {
+        val db = PuttDatabase.getDatabase(getApplication())
+        val now = System.currentTimeMillis()
+        viewModelScope.launch {
+            val all = db.puttSessionDao().getSessionsByDistance(distance)
+            val filteredByStyle = if (style == null || style == "All") all else all.filter { it.style == style }
+            val filtered = when (range) {
+                "Last week" -> filteredByStyle.filter { it.date >= now - 7 * 24 * 60 * 60 * 1000L }
+                "Last month" -> filteredByStyle.filter { it.date >= now - 30 * 24 * 60 * 60 * 1000L }
+                "Last year" -> filteredByStyle.filter { it.date >= now - 365 * 24 * 60 * 60 * 1000L }
+                else -> filteredByStyle
             }
             _sessions.value = filtered.take(10)
         }
