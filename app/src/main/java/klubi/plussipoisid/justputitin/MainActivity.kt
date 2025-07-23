@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -60,6 +61,28 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import klubi.plussipoisid.justputitin.ui.TrendsScreen
+import android.media.MediaPlayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.painterResource
+
+
+@Composable
+fun FadingAppNavHost() {
+    var visible by remember { mutableStateOf(false) }
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 2000)
+    )
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+    Box(modifier = Modifier.fillMaxSize().alpha(alpha)) {
+        AppNavHost()
+    }
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,7 +90,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             JPIITheme {
-                AppNavHost()
+                FadingAppNavHost()
             }
         }
     }
@@ -89,7 +112,8 @@ fun AppNavHost() {
                 AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
                     MainMenuScreen(
                         onStartSession = { navController.navigate("session_setup") },
-                        onCheckStats = { navController.navigate("statistics") }
+                        onCheckStats = { navController.navigate("statistics") },
+                        onTrends = { navController.navigate("trends") }
                     )
                 }
             }
@@ -109,6 +133,14 @@ fun AppNavHost() {
             Surface(color = MaterialTheme.colorScheme.secondaryContainer, tonalElevation = 2.dp) {
                 AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
                     StatisticsScreen()
+                }
+            }
+        }
+        composable("trends") {
+            currentScreen.value = "trends"
+            Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+                AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
+                    TrendsScreen()
                 }
             }
         }
@@ -132,14 +164,28 @@ fun AppNavHost() {
 }
 
 @Composable
-fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit) {
+fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrends: () -> Unit) {
+    val viewModel: SessionViewModel = viewModel()
+    val puttingRating by viewModel.puttingRating.collectAsState()
+    LaunchedEffect(Unit) {
+        viewModel.loadPuttingRating()
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Icon(
+            painter = painterResource(id = R.drawable.jpii_foreground),
+            contentDescription = "App Icon",
+            modifier = Modifier
+                .size(260.dp)
+                .padding(top = 16.dp, bottom = 16.dp),
+            tint = Color.Unspecified
+        )
+        Text("Putting Rating: $puttingRating", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 16.dp))
         Text("Just put it in!", modifier = Modifier.padding(bottom = 32.dp))
         Button(onClick = onStartSession, modifier = Modifier.fillMaxWidth()) {
             Text("New session")
@@ -147,6 +193,10 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = onCheckStats, modifier = Modifier.fillMaxWidth()) {
             Text("History")
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onTrends, modifier = Modifier.fillMaxWidth()) {
+            Text("Line Trends")
         }
     }
 }
@@ -164,12 +214,16 @@ fun StatisticsScreen() {
     val selectedDistance = remember { mutableStateOf<Int?>(null) }
     val selectedRange = remember { mutableStateOf(historyOptions[0]) }
     val selectedStyle = remember { mutableStateOf("All") }
+    val averageHitRate = viewModel.averageHitRate.collectAsState().value
 
     LaunchedEffect(Unit) {
         viewModel.loadDistances()
     }
     LaunchedEffect(selectedDistance.value) {
-        selectedDistance.value?.let { viewModel.loadStylesForDistance(it) }
+        selectedDistance.value?.let {
+            viewModel.loadStylesForDistance(it)
+            viewModel.loadAverageHitRate(it)
+        }
     }
     LaunchedEffect(selectedDistance.value, selectedStyle.value, selectedRange.value) {
         selectedDistance.value?.let { viewModel.loadSessionsForDistanceAndStyle(it, if (selectedStyle.value == "All") null else selectedStyle.value, selectedRange.value) }
@@ -219,6 +273,13 @@ fun StatisticsScreen() {
                         )
                     }
                 }
+            }
+            if (averageHitRate != null && selectedDistance.value != null) {
+                Text(
+                    text = "Average hit rate for ${selectedDistance.value}m: ${(averageHitRate * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
             Box {
@@ -371,6 +432,8 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
     val hitRate = if (numPutts > 0) (successful.value * 100 / numPutts) else 0
     var saved = remember { mutableStateOf(false) }
     val selectedStyle = remember { mutableStateOf(style) }
+    val context = LocalContext.current
+    val soundOn by viewModel.soundOn.collectAsState()
 
     // Intercept system back and go to main menu
     BackHandler {
@@ -441,8 +504,12 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                 Box(contentAlignment = Alignment.Center) {
                     Button(
                         onClick = {
-                            viewModel.saveSession(distance, numPutts, successful.value, selectedStyle.value)
+                            val puttsMade = successful.value
+                            viewModel.saveSession(distance, numPutts, puttsMade, selectedStyle.value)
                             saved.value = true
+                            if (puttsMade == numPutts && numPutts > 0 && soundOn) {
+                                playKawaiiSound(context)
+                            }
                             successful.value = numPutts
                         },
                         enabled = successful.value in 0..numPutts && !saved.value,
@@ -477,11 +544,34 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Sound effects toggle
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sound effects", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    androidx.compose.material3.Switch(
+                        checked = soundOn,
+                        onCheckedChange = { viewModel.setSoundOn(it) }
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = onAdjust) {
                     Text("Adjust Session Settings")
                 }
             }
         }
+    }
+}
+
+fun playKawaiiSound(context: android.content.Context) {
+    try {
+        val mediaPlayer = MediaPlayer.create(context, R.raw.kawaii)
+        mediaPlayer?.setOnCompletionListener { mp ->
+            mp.release()
+        }
+        mediaPlayer?.start()
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }
 
@@ -493,6 +583,13 @@ fun SessionSetupScreen(onStartSession: (Int, Int, String) -> Unit) {
     val styles = viewModel.styles
     val selectedStyle = viewModel.selectedStyle.collectAsState().value
     val expandedStyle = remember { mutableStateOf(false) }
+    val averageHitRate = viewModel.averageHitRate.collectAsState().value
+
+    LaunchedEffect(distance) {
+        if (distance in 1..30) {
+            viewModel.loadAverageHitRate(distance)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -535,6 +632,19 @@ fun SessionSetupScreen(onStartSession: (Int, Int, String) -> Unit) {
                     selected = if (distance in 1..30) distance else null,
                     onSelected = { viewModel.setDistance(it) }
                 )
+                if (averageHitRate != null && distance in 1..30) {
+                    Text(
+                        text = "Average hit rate for ${distance}m: ${(averageHitRate * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                    )
+                } else if (distance in 1..30) {
+                    Text(
+                        text = "No sessions recorded",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Select Number of Putts", style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(8.dp))

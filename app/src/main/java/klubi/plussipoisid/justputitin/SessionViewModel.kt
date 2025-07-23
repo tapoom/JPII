@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import klubi.plussipoisid.justputitin.data.PuttDatabase
 import klubi.plussipoisid.justputitin.data.PuttSession
+import klubi.plussipoisid.justputitin.data.PuttSessionDao
+import kotlin.math.ln
+import kotlin.math.roundToInt
 
 class SessionViewModel(application: Application) : AndroidViewModel(application) {
     private val _distance = MutableStateFlow(0)
@@ -43,6 +46,39 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     val selectedStyle: StateFlow<String> = _selectedStyle.asStateFlow()
     fun setStyle(style: String) { _selectedStyle.value = style }
 
+    // Sound effects toggle
+    private val _soundOn = MutableStateFlow(true)
+    val soundOn: StateFlow<Boolean> = _soundOn.asStateFlow()
+    fun setSoundOn(enabled: Boolean) { _soundOn.value = enabled }
+
+    // Average hit rate for selected distance
+    private val _averageHitRate = MutableStateFlow<Double?>(null)
+    val averageHitRate: StateFlow<Double?> = _averageHitRate.asStateFlow()
+    fun loadAverageHitRate(distance: Int) {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            val sessions = db.puttSessionDao().getAtLeastTenSessionsByDistance(distance)
+            if (sessions.isNotEmpty()) {
+                val totalPutts = sessions.sumOf { it.numPutts }
+                val totalMade = sessions.sumOf { it.madePutts }
+                _averageHitRate.value = if (totalPutts > 0) totalMade.toDouble() / totalPutts else null
+            } else {
+                _averageHitRate.value = null
+            }
+        }
+    }
+
+    // Putting rating state
+    private val _puttingRating = MutableStateFlow(0)
+    val puttingRating: StateFlow<Int> = _puttingRating.asStateFlow()
+    fun loadPuttingRating() {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            val rating = db.puttSessionDao().puttingIndex().toRating()
+            _puttingRating.value = rating
+        }
+    }
+
     fun setDistance(value: Int) {
         _distance.value = value
     }
@@ -66,13 +102,14 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         )
         viewModelScope.launch {
             db.puttSessionDao().insertSession(session)
+            loadPuttingRating() // Refresh rating after saving
         }
     }
 
     fun loadSessionsForDistance(distance: Int) {
         val db = PuttDatabase.getDatabase(getApplication())
         viewModelScope.launch {
-            _sessions.value = db.puttSessionDao().getSessionsByDistance(distance).take(10)
+            _sessions.value = db.puttSessionDao().getSessionsByDistance(distance)
         }
     }
 
@@ -101,7 +138,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 "Last year" -> all.filter { it.date >= now - 365 * 24 * 60 * 60 * 1000L }
                 else -> all
             }
-            _sessions.value = filtered.take(10)
+            _sessions.value = filtered
         }
     }
 
@@ -117,7 +154,72 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 "Last year" -> filteredByStyle.filter { it.date >= now - 365 * 24 * 60 * 60 * 1000L }
                 else -> filteredByStyle
             }
-            _sessions.value = filtered.take(10)
+            _sessions.value = filtered
         }
     }
+
+    // Calculate putt rating
+    data class DistanceStats(
+        val distance: Int,
+        val attempts: Int,
+        val made: Int,
+        val pct: Double          // 0 – 1
+    )
+
+    private fun linearWeight(d: Int): Double {
+        return d.toDouble() / 15.0
+    }
+
+    private fun quadraticWeight(d: Int): Double {
+        val norm = d.toDouble() / 15.0
+        return norm * norm   // (d / 15)^2
+    }
+
+    private fun logarithmicWeight(d: Int): Double {
+        return ln((1 + d).toDouble()) / ln(16.0)  // ln(1+d) normalized to 0–1
+    }
+
+    suspend fun PuttSessionDao.puttingIndex(): Double {
+        val rows = distanceStats()
+        if (rows.isEmpty()) return 0.0          // no data yet
+
+        val (num, den) = rows.fold(0.0 to 0.0) { (n, d), row ->
+            val w = linearWeight(row.distance) * row.attempts   // more data ⇒ higher confidence
+            (n + w * row.pct) to (d + w)
+        }
+        return if (den == 0.0) 0.0 else num / den        // 0 – 1
+    }
+
+    fun Double.toRating(): Int = (this * 100).roundToInt()   // 0 – 100 scale
+
+    suspend fun PuttSessionDao.lastSessionsForPuttRange(
+        distance: Int,
+        minPutts: Int = 10,
+        maxPutts: Int = 30
+    ): List<PuttSession> {
+        val sessions = allSessionsAt(distance)
+        val result = mutableListOf<PuttSession>()
+        var count = 0
+
+        for (session in sessions) {
+            if (count >= maxPutts) break
+            result.add(session)
+            count += session.numPutts
+        }
+
+        return if (count >= minPutts) result else emptyList()
+    }
+
+    suspend fun PuttSessionDao.distanceStats(
+        minPutts: Int = 10,
+        maxPutts: Int = 30
+    ): List<DistanceStats> =
+        (3..15).mapNotNull { d ->
+            val s = lastSessionsForPuttRange(d, minPutts, maxPutts)
+            if (s.isEmpty()) return@mapNotNull null
+
+            val made  = s.sumOf { it.madePutts }
+            val tries = s.sumOf { it.numPutts }
+            DistanceStats(d, tries, made, made.toDouble() / tries)
+        }
 } 

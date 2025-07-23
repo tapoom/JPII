@@ -14,4 +14,13 @@ interface PuttSessionDao {
 
     @Query("SELECT * FROM putt_sessions WHERE distance = :distance ORDER BY date DESC")
     suspend fun getSessionsByDistance(distance: Int): List<PuttSession>
+
+    @Query("SELECT * FROM putt_sessions WHERE distance = :distance ORDER BY date DESC LIMIT 10")
+    suspend fun getAtLeastTenSessionsByDistance(distance: Int): List<PuttSession>
+    @Query("""
+    SELECT * FROM putt_sessions 
+    WHERE distance = :d 
+    ORDER BY date DESC
+""")
+    suspend fun allSessionsAt(d: Int): List<PuttSession>
 } 
