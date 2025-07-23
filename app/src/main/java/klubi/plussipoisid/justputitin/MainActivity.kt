@@ -155,18 +155,24 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit) {
 fun StatisticsScreen() {
     val viewModel: SessionViewModel = viewModel()
     val distances = viewModel.distances.collectAsState().value
+    val stylesForDistance = viewModel.stylesForDistance.collectAsState().value
     val sessions = viewModel.sessions.collectAsState().value
     val historyOptions = listOf("Last week", "Last month", "Last year", "All time")
     val expandedDistance = remember { mutableStateOf(false) }
     val expandedRange = remember { mutableStateOf(false) }
+    val expandedStyle = remember { mutableStateOf(false) }
     val selectedDistance = remember { mutableStateOf<Int?>(null) }
     val selectedRange = remember { mutableStateOf(historyOptions[0]) }
+    val selectedStyle = remember { mutableStateOf("All") }
 
     LaunchedEffect(Unit) {
         viewModel.loadDistances()
     }
-    LaunchedEffect(selectedDistance.value, selectedRange.value) {
-        selectedDistance.value?.let { viewModel.loadSessionsForDistanceAndRange(it, selectedRange.value) }
+    LaunchedEffect(selectedDistance.value) {
+        selectedDistance.value?.let { viewModel.loadStylesForDistance(it) }
+    }
+    LaunchedEffect(selectedDistance.value, selectedStyle.value, selectedRange.value) {
+        selectedDistance.value?.let { viewModel.loadSessionsForDistanceAndStyle(it, if (selectedStyle.value == "All") null else selectedStyle.value, selectedRange.value) }
     }
 
     Column(
@@ -208,6 +214,40 @@ fun StatisticsScreen() {
                             onClick = {
                                 selectedDistance.value = d
                                 expandedDistance.value = false
+                                selectedStyle.value = "All"
+                            }
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Box {
+                Button(
+                    onClick = { expandedStyle.value = true },
+                    enabled = stylesForDistance.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    Text(selectedStyle.value)
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Pick Style")
+                }
+                DropdownMenu(
+                    expanded = expandedStyle.value,
+                    onDismissRequest = { expandedStyle.value = false },
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("All") },
+                        onClick = {
+                            selectedStyle.value = "All"
+                            expandedStyle.value = false
+                        }
+                    )
+                    stylesForDistance.forEach { style ->
+                        DropdownMenuItem(
+                            text = { Text(style) },
+                            onClick = {
+                                selectedStyle.value = style
+                                expandedStyle.value = false
                             }
                         )
                     }
@@ -241,7 +281,7 @@ fun StatisticsScreen() {
         }
         Spacer(modifier = Modifier.height(24.dp))
         if (sessions.isEmpty() && distances.isNotEmpty()) {
-            Text("No sessions found for this distance and range.")
+            Text("No sessions found for this distance, style, and range.")
         } else if (sessions.isNotEmpty()) {
             val lastSession = sessions.first()
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(lastSession.date))
