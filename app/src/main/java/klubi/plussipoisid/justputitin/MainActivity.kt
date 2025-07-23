@@ -61,6 +61,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import klubi.plussipoisid.justputitin.ui.TrendsScreen
+import android.media.MediaPlayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.core.animateFloatAsState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -385,6 +388,8 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
     val hitRate = if (numPutts > 0) (successful.value * 100 / numPutts) else 0
     var saved = remember { mutableStateOf(false) }
     val selectedStyle = remember { mutableStateOf(style) }
+    val context = LocalContext.current
+    var showKawaiiPopup by remember { mutableStateOf(false) }
 
     // Intercept system back and go to main menu
     BackHandler {
@@ -405,6 +410,26 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
             ),
         contentAlignment = Alignment.Center
     ) {
+        // KAWAII! Popup Animation
+        AnimatedVisibility(
+            visible = showKawaiiPopup,
+            enter = fadeIn(animationSpec = tween(400)),
+            exit = fadeOut(animationSpec = tween(400)),
+        ) {
+            val scale by animateFloatAsState(
+                targetValue = if (showKawaiiPopup) 1.2f else 0.8f,
+                animationSpec = tween(durationMillis = 400), label = ""
+            )
+            Text(
+                text = "KAWAII!",
+                color = Color.Magenta,
+                fontSize = 48.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier
+                    .scale(scale)
+                    .shadow(8.dp)
+            )
+        }
         Card(
             shape = RoundedCornerShape(32.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
@@ -455,8 +480,18 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                 Box(contentAlignment = Alignment.Center) {
                     Button(
                         onClick = {
-                            viewModel.saveSession(distance, numPutts, successful.value, selectedStyle.value)
+                            val puttsMade = successful.value
+                            viewModel.saveSession(distance, numPutts, puttsMade, selectedStyle.value)
                             saved.value = true
+                            if (puttsMade == numPutts && numPutts > 0) {
+                                playKawaiiSound(context)
+                                showKawaiiPopup = true
+                                // Hide after 1.5s
+                                androidx.compose.runtime.LaunchedEffect(showKawaiiPopup) {
+                                    kotlinx.coroutines.delay(1500)
+                                    showKawaiiPopup = false
+                                }
+                            }
                             successful.value = numPutts
                         },
                         enabled = successful.value in 0..numPutts && !saved.value,
@@ -496,6 +531,18 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                 }
             }
         }
+    }
+}
+
+fun playKawaiiSound(context: android.content.Context) {
+    try {
+        val mediaPlayer = MediaPlayer.create(context, R.raw.kawaii)
+        mediaPlayer?.setOnCompletionListener { mp ->
+            mp.release()
+        }
+        mediaPlayer?.start()
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }
 
