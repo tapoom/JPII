@@ -1,6 +1,5 @@
 package klubi.plussipoisid.justputitin.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -14,7 +13,16 @@ import androidx.compose.ui.platform.LocalContext
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
+    // onSecondary = JPIIOrange,
     tertiary = Pink80
+    /*
+    background = JPIILightGreen,
+    primary = JPIIGreen,
+    onPrimary = JPIIOrange,
+    secondary = PurpleGrey80,
+    onSecondary = JPIIOrange,
+    tertiary = Pink80
+     */
 )
 
 private val LightColorScheme = lightColorScheme(

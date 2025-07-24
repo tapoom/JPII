@@ -68,13 +68,11 @@ import klubi.plussipoisid.justputitin.ui.TrendsScreen
 import android.media.MediaPlayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-
 
 @Composable
 fun FadingAppNavHost() {
@@ -582,7 +580,7 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                     )
                     Spacer(modifier = Modifier.width(24.dp))
                     Icon(
-                        imageVector = Icons.Default.Check,
+                        imageVector = Icons.Default.CheckCircle,
                         contentDescription = "Throws",
                         tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(28.dp)
