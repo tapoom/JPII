@@ -158,6 +158,28 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // New: Load sessions for all distances in a custom date range
+    fun loadSessionsByDateRange(startDate: Long, endDate: Long, onResult: (List<PuttSession>) -> Unit) {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            val sessions = db.puttSessionDao().getSessionsByDateRange(startDate, endDate)
+            onResult(sessions)
+        }
+    }
+
+    // New: Aggregate hit rate per distance for a given date range (1-30m)
+    fun getHitRatePerDistance(sessions: List<PuttSession>): List<Pair<Int, Float>> {
+        val result = mutableListOf<Pair<Int, Float>>()
+        for (distance in 1..30) {
+            val filtered = sessions.filter { it.distance == distance }
+            val totalPutts = filtered.sumOf { it.numPutts }
+            val totalMade = filtered.sumOf { it.madePutts }
+            val hitRate = if (totalPutts > 0) (totalMade * 100f / totalPutts) else 0f
+            result.add(distance to hitRate)
+        }
+        return result
+    }
+
     // Calculate putt rating
     data class DistanceStats(
         val distance: Int,

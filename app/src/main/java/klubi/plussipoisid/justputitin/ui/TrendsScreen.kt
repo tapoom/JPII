@@ -19,6 +19,9 @@ import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.ValueFormatter
 import klubi.plussipoisid.justputitin.SessionViewModel
+import android.app.DatePickerDialog
+import java.util.Calendar
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun TrendsScreen() {
@@ -41,6 +44,33 @@ fun TrendsScreen() {
             selectedStyle.value = "All"
             previousDistance = selectedDistance.value
         }
+    }
+
+    val customRange = remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    val showDatePicker = remember { mutableStateOf(false) }
+    val isPickingStart = remember { mutableStateOf(true) }
+    val calendar = Calendar.getInstance()
+    val context = LocalContext.current
+    val sessionsForRange = remember { mutableStateOf<List<klubi.plussipoisid.justputitin.data.PuttSession>>(emptyList()) }
+    val hitRates = remember { mutableStateOf<List<Pair<Int, Float>>>(emptyList()) }
+
+    // Date picker dialog logic
+    fun showPicker(isStart: Boolean) {
+        val now = Calendar.getInstance()
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                val cal = Calendar.getInstance()
+                cal.set(year, month, day, 0, 0, 0)
+                val time = cal.timeInMillis
+                if (isStart) {
+                    customRange.value = time to (customRange.value?.second ?: time)
+                } else {
+                    customRange.value = (customRange.value?.first ?: time) to time
+                }
+            },
+            now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH)
+        ).show()
     }
 
     LaunchedEffect(Unit) {
@@ -164,21 +194,68 @@ fun TrendsScreen() {
                             text = { Text(option) },
                             onClick = {
                                 selectedRange.value = option
+                                customRange.value = null
                                 expandedRange.value = false
                             }
                         )
                     }
+                    DropdownMenuItem(
+                        text = { Text("Custom Range") },
+                        onClick = {
+                            expandedRange.value = false
+                            showDatePicker.value = true
+                        }
+                    )
                 }
+            }
+            if (showDatePicker.value) {
+                // Show two date pickers for start and end
+                LaunchedEffect(Unit) {
+                    showPicker(true)
+                    showPicker(false)
+                    showDatePicker.value = false
+                }
+            }
+            if (customRange.value != null) {
+                val start = java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date(customRange.value!!.first))
+                val end = java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date(customRange.value!!.second))
+                Text("Custom: $start to $end", style = MaterialTheme.typography.bodySmall)
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
-        if (entries.isEmpty() && distances.isNotEmpty()) {
-            Text("No sessions found for this distance, style, and range.")
-        } else if (entries.isNotEmpty()) {
+        // Data loading for chart
+        LaunchedEffect(selectedRange.value, customRange.value) {
+            if (customRange.value != null) {
+                viewModel.loadSessionsByDateRange(customRange.value!!.first, customRange.value!!.second) { sessions ->
+                    sessionsForRange.value = sessions
+                    hitRates.value = viewModel.getHitRatePerDistance(sessions)
+                }
+            } else {
+                // Use default periods
+                val now = System.currentTimeMillis()
+                val (start, end) = when (selectedRange.value) {
+                    "Last week" -> now - 7 * 24 * 60 * 60 * 1000L to now
+                    "Last month" -> now - 30 * 24 * 60 * 60 * 1000L to now
+                    "Last year" -> now - 365 * 24 * 60 * 60 * 1000L to now
+                    else -> 0L to now
+                }
+                viewModel.loadSessionsByDateRange(start, end) { sessions ->
+                    sessionsForRange.value = sessions
+                    hitRates.value = viewModel.getHitRatePerDistance(sessions)
+                }
+            }
+        }
+        if (hitRates.value.isEmpty() && distances.isNotEmpty()) {
+            Text("No sessions found for this period.")
+        } else if (hitRates.value.isNotEmpty()) {
+            // Show line chart: x = distance, y = hit rate
+            val entries = hitRates.value.map { (distance, hitRate) ->
+                Entry(distance.toFloat(), hitRate)
+            }
             AndroidView(
                 factory = { ctx ->
                     val chart = LineChart(ctx)
-                    val dataSet = LineDataSet(entries, "Hit Rate %")
+                    val dataSet = LineDataSet(entries, "Hit Rate % by Distance")
                     dataSet.color = android.graphics.Color.BLUE
                     dataSet.valueTextColor = android.graphics.Color.BLACK
                     dataSet.setDrawCircles(true)
@@ -196,8 +273,7 @@ fun TrendsScreen() {
                     chart.xAxis.granularity = 1f
                     chart.xAxis.valueFormatter = object : ValueFormatter() {
                         override fun getFormattedValue(value: Float): String {
-                            val idx = value.toInt()
-                            return if (idx in dates.indices) dates[idx] else ""
+                            return value.toInt().toString() + "m"
                         }
                     }
                     chart.description.isEnabled = false
@@ -207,7 +283,7 @@ fun TrendsScreen() {
                     chart
                 },
                 update = { chart ->
-                    val dataSet = LineDataSet(entries, "Hit Rate %")
+                    val dataSet = LineDataSet(entries, "Hit Rate % by Distance")
                     dataSet.color = android.graphics.Color.BLUE
                     dataSet.valueTextColor = android.graphics.Color.BLACK
                     dataSet.setDrawCircles(true)
@@ -220,8 +296,7 @@ fun TrendsScreen() {
                     chart.data = lineData
                     chart.xAxis.valueFormatter = object : ValueFormatter() {
                         override fun getFormattedValue(value: Float): String {
-                            val idx = value.toInt()
-                            return if (idx in dates.indices) dates[idx] else ""
+                            return value.toInt().toString() + "m"
                         }
                     }
                     chart.invalidate()
