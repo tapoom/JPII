@@ -20,8 +20,10 @@ import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.ValueFormatter
 import klubi.plussipoisid.justputitin.SessionViewModel
 import android.app.DatePickerDialog
+import androidx.compose.foundation.shape.RoundedCornerShape
 import java.util.Calendar
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.toArgb
 
 @Composable
 fun TrendsScreen() {
@@ -30,19 +32,18 @@ fun TrendsScreen() {
     val sessions = viewModel.sessions.collectAsState().value
     val historyOptions = listOf("Last week", "Last month", "Last year", "All time")
     val expandedRange = remember { mutableStateOf(false) }
-    val selectedDistance = remember { mutableStateOf<Int?>(null) }
+    // Remove distance picker state and effect
+    // val selectedDistance = remember { mutableStateOf<Int?>(null) }
+    // var previousDistance by remember { mutableStateOf<Int?>(null) }
+    // LaunchedEffect(selectedDistance.value) {
+    //     if (selectedDistance.value != null && selectedDistance.value != previousDistance) {
+    //         selectedStyle.value = "All"
+    //         previousDistance = selectedDistance.value
+    //     }
+    // }
     val selectedRange = remember { mutableStateOf(historyOptions[0]) }
     val selectedStyle = remember { mutableStateOf("All") }
     val expandedStyle = remember { mutableStateOf(false) }
-
-    // Track previous distance to only reset style when distance actually changes
-    var previousDistance by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(selectedDistance.value) {
-        if (selectedDistance.value != null && selectedDistance.value != previousDistance) {
-            selectedStyle.value = "All"
-            previousDistance = selectedDistance.value
-        }
-    }
 
     val customRange = remember { mutableStateOf<Pair<Long, Long>?>(null) }
     val showDatePicker = remember { mutableStateOf(false) }
@@ -91,13 +92,14 @@ fun TrendsScreen() {
         }
     }
 
-    val entries = sessions.sortedBy { it.date }.mapIndexed { idx, session ->
-        val hitRate = if (session.numPutts > 0) (session.madePutts * 100f / session.numPutts) else 0f
-        Entry(idx.toFloat(), hitRate)
-    }
-    val dates = sessions.sortedBy { it.date }.map { session ->
-        java.text.SimpleDateFormat("MM-dd", java.util.Locale.getDefault()).format(java.util.Date(session.date))
-    }
+    // Remove these unused variables that cause @Composable invocation errors
+    // val entries = sessions.sortedBy { it.date }.mapIndexed { idx, session ->
+    //     val hitRate = if (session.numPutts > 0) (session.madePutts * 100f / session.numPutts) else 0f
+    //     Entry(idx.toFloat(), hitRate)
+    // }
+    // val dates = sessions.sortedBy { it.date }.map { session ->
+    //     java.text.SimpleDateFormat("MM-dd", java.util.Locale.getDefault()).format(java.util.Date(session.date))
+    // }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -227,63 +229,98 @@ fun TrendsScreen() {
         if (hitRates.value.isEmpty()) {
             Text("No sessions found for this period.")
         } else if (hitRates.value.isNotEmpty()) {
-            // Show line chart: x = distance, y = hit rate
-            val entries = hitRates.value.map { (distance, hitRate) ->
-                Entry(distance.toFloat(), hitRate)
-            }
-            AndroidView(
-                factory = { ctx ->
-                    val chart = LineChart(ctx)
-                    val dataSet = LineDataSet(entries, "Hit Rate % by Distance")
-                    dataSet.color = android.graphics.Color.BLUE
-                    dataSet.valueTextColor = android.graphics.Color.BLACK
-                    dataSet.setDrawCircles(true)
-                    dataSet.setDrawValues(true)
-                    dataSet.lineWidth = 2f
-                    dataSet.circleRadius = 4f
-                    dataSet.setDrawFilled(true)
-                    dataSet.fillAlpha = 50
-                    val lineData = LineData(dataSet)
-                    chart.data = lineData
-                    chart.axisLeft.axisMinimum = 0f
-                    chart.axisLeft.axisMaximum = 100f
-                    chart.axisRight.isEnabled = false
-                    chart.xAxis.position = XAxis.XAxisPosition.BOTTOM
-                    chart.xAxis.granularity = 1f
-                    chart.xAxis.valueFormatter = object : ValueFormatter() {
-                        override fun getFormattedValue(value: Float): String {
-                            return value.toInt().toString() + "m"
-                        }
-                    }
-                    chart.description.isEnabled = false
-                    chart.legend.isEnabled = true
-                    chart.layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, 600)
-                    chart.invalidate()
-                    chart
-                },
-                update = { chart ->
-                    val dataSet = LineDataSet(entries, "Hit Rate % by Distance")
-                    dataSet.color = android.graphics.Color.BLUE
-                    dataSet.valueTextColor = android.graphics.Color.BLACK
-                    dataSet.setDrawCircles(true)
-                    dataSet.setDrawValues(true)
-                    dataSet.lineWidth = 2f
-                    dataSet.circleRadius = 4f
-                    dataSet.setDrawFilled(true)
-                    dataSet.fillAlpha = 50
-                    val lineData = LineData(dataSet)
-                    chart.data = lineData
-                    chart.xAxis.valueFormatter = object : ValueFormatter() {
-                        override fun getFormattedValue(value: Float): String {
-                            return value.toInt().toString() + "m"
-                        }
-                    }
-                    chart.invalidate()
-                },
+            val primary = MaterialTheme.colorScheme.primary.toArgb()
+            val secondary = MaterialTheme.colorScheme.secondary.toArgb()
+            val background = MaterialTheme.colorScheme.surface.toArgb()
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(300.dp)
-            )
+                    .height(340.dp)
+            ) {
+                Box(modifier = Modifier.padding(16.dp)) {
+                    val entries = hitRates.value.map { (distance, hitRate) ->
+                        Entry(distance.toFloat(), hitRate)
+                    }
+                    AndroidView(
+                        factory = { ctx ->
+                            val chart = LineChart(ctx)
+                            val dataSet = LineDataSet(entries, "Hit Rate % by Distance")
+                            dataSet.color = primary
+                            dataSet.valueTextColor = secondary
+                            dataSet.setDrawCircles(true)
+                            dataSet.setCircleColor(primary)
+                            dataSet.setDrawValues(true)
+                            dataSet.lineWidth = 3f
+                            dataSet.circleRadius = 5f
+                            dataSet.setDrawFilled(true)
+                            dataSet.fillAlpha = 120
+                            dataSet.fillColor = primary
+                            dataSet.mode = LineDataSet.Mode.CUBIC_BEZIER
+                            val lineData = LineData(dataSet)
+                            chart.data = lineData
+                            chart.axisLeft.axisMinimum = 0f
+                            chart.axisLeft.axisMaximum = 100f
+                            chart.axisLeft.textColor = secondary
+                            chart.axisLeft.textSize = 14f
+                            chart.axisLeft.gridColor = secondary
+                            chart.axisRight.isEnabled = false
+                            chart.xAxis.position = XAxis.XAxisPosition.BOTTOM
+                            chart.xAxis.granularity = 1f
+                            chart.xAxis.textColor = secondary
+                            chart.xAxis.textSize = 14f
+                            chart.xAxis.gridColor = secondary
+                            chart.xAxis.valueFormatter = object : ValueFormatter() {
+                                override fun getFormattedValue(value: Float): String {
+                                    return value.toInt().toString() + "m"
+                                }
+                            }
+                            chart.setBackgroundColor(background)
+                            chart.description.isEnabled = false
+                            chart.legend.isEnabled = false
+                            chart.setDrawGridBackground(false)
+                            chart.setPadding(16, 16, 16, 16)
+                            chart.setExtraOffsets(8f, 8f, 8f, 8f)
+                            chart.invalidate()
+                            chart
+                        },
+                        update = { chart ->
+                            val dataSet = LineDataSet(entries, "Hit Rate % by Distance")
+                            dataSet.color = primary
+                            dataSet.valueTextColor = secondary
+                            dataSet.setDrawCircles(true)
+                            dataSet.setCircleColor(primary)
+                            dataSet.setDrawValues(true)
+                            dataSet.lineWidth = 3f
+                            dataSet.circleRadius = 5f
+                            dataSet.setDrawFilled(true)
+                            dataSet.fillAlpha = 120
+                            dataSet.fillColor = primary
+                            dataSet.mode = LineDataSet.Mode.CUBIC_BEZIER
+                            val lineData = LineData(dataSet)
+                            chart.data = lineData
+                            chart.axisLeft.textColor = secondary
+                            chart.axisLeft.textSize = 14f
+                            chart.axisLeft.gridColor = secondary
+                            chart.xAxis.textColor = secondary
+                            chart.xAxis.textSize = 14f
+                            chart.xAxis.gridColor = secondary
+                            chart.xAxis.valueFormatter = object : ValueFormatter() {
+                                override fun getFormattedValue(value: Float): String {
+                                    return value.toInt().toString() + "m"
+                                }
+                            }
+                            chart.setBackgroundColor(background)
+                            chart.invalidate()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                    )
+                }
+            }
         }
     }
 } 
