@@ -555,8 +555,46 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                     modifier = Modifier.padding(bottom = 16.dp),
                     textAlign = TextAlign.Center
                 )
-                Text("Distance: $distance meters", style = MaterialTheme.typography.bodyLarge)
-                Text("Throws: $numPutts", style = MaterialTheme.typography.bodyLarge)
+                // Make distance and throws more prominent
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(vertical = 12.dp, horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Distance",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Text(
+                        text = "$distance m",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                    Spacer(modifier = Modifier.width(24.dp))
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Throws",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Text(
+                        text = "$numPutts throws",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text("Style: " + selectedStyle.value, style = MaterialTheme.typography.bodyMedium)
