@@ -222,4 +222,14 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             val tries = s.sumOf { it.numPutts }
             DistanceStats(d, tries, made, made.toDouble() / tries)
         }
+
+    fun deleteSession(session: PuttSession) {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            db.puttSessionDao().deleteSession(session)
+            loadSessionsForDistance(session.distance)
+            loadPuttingRating()
+            loadAverageHitRate(session.distance)
+        }
+    }
 } 

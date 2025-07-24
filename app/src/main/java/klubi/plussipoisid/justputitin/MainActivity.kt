@@ -30,6 +30,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,6 +68,7 @@ import klubi.plussipoisid.justputitin.ui.TrendsScreen
 import android.media.MediaPlayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
 
@@ -281,7 +285,7 @@ fun StatisticsScreen() {
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Box {
                 Button(
                     onClick = { expandedStyle.value = true },
@@ -314,7 +318,7 @@ fun StatisticsScreen() {
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Box {
                 Button(
                     onClick = { expandedRange.value = true },
@@ -340,10 +344,11 @@ fun StatisticsScreen() {
                 }
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         if (sessions.isEmpty() && distances.isNotEmpty()) {
             Text("No sessions found for this distance, style, and range.")
         } else if (sessions.isNotEmpty()) {
+            var showDeleteDialog by remember { mutableStateOf(false) }
             val lastSession = sessions.first()
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(lastSession.date))
             val hitRate = if (lastSession.numPutts > 0) (lastSession.madePutts * 100 / lastSession.numPutts) else 0
@@ -352,23 +357,54 @@ fun StatisticsScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Last Session", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("$date", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("Throws: ${lastSession.numPutts}")
-                    Text("Hits: ${lastSession.madePutts}")
-                    Text("Hit Rate: $hitRate%", fontWeight = FontWeight.Bold)
-                    Text("Style: ${lastSession.style}")
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Last Session - $date", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("Throws: ${lastSession.numPutts} / Hits: ${lastSession.madePutts}")
+                        Text("Style: ${lastSession.style}")
+                    }
+                    Text("$hitRate%", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                    IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.align(Alignment.CenterVertically)) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete Session",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            if (showDeleteDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = { Text("Delete Session") },
+                    text = { Text("Are you sure you want to delete this session?") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            viewModel.deleteSession(lastSession)
+                            showDeleteDialog = false
+                        }) {
+                            Text("Delete")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             BarChart(sessions = sessions)
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(sessions.drop(1)) { session ->
+                    var showDeleteDialog by remember { mutableStateOf(false) }
                     val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(session.date))
                     val hitRate = if (session.numPutts > 0) (session.madePutts * 100 / session.numPutts) else 0
                     Card(
@@ -382,11 +418,37 @@ fun StatisticsScreen() {
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("$date", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text("Throws: ${session.numPutts}")
-                                Text("Hits: ${session.madePutts}")
+                                Text("Throws: ${session.numPutts} / Hits: ${session.madePutts}")
                                 Text("Style: ${session.style}")
                             }
                             Text("$hitRate%", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                            IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.align(Alignment.CenterVertically)) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete Session",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        if (showDeleteDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showDeleteDialog = false },
+                                title = { Text("Delete Session") },
+                                text = { Text("Are you sure you want to delete this session?") },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        viewModel.deleteSession(session)
+                                        showDeleteDialog = false
+                                    }) {
+                                        Text("Delete")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDeleteDialog = false }) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -399,14 +461,14 @@ fun StatisticsScreen() {
 fun BarChart(sessions: List<PuttSession>) {
     val maxRate = (sessions.maxOfOrNull { if (it.numPutts > 0) (it.madePutts * 100 / it.numPutts) else 0 } ?: 100).coerceAtLeast(100)
     val barWidth = 32.dp
-    val chartHeight = 160.dp
+    val chartHeight = 80.dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(chartHeight)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         sessions.forEach { session ->
             val hitRate = if (session.numPutts > 0) (session.madePutts * 100 / session.numPutts) else 0
@@ -419,7 +481,7 @@ fun BarChart(sessions: List<PuttSession>) {
                     .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                Text("$hitRate%", color = MaterialTheme.colorScheme.onPrimary, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+                Text("$hitRate%", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, modifier = Modifier.padding(bottom = 4.dp))
             }
         }
     }

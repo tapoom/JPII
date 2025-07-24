@@ -3,6 +3,7 @@ package klubi.plussipoisid.justputitin.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Delete
 
 @Dao
 interface PuttSessionDao {
@@ -23,4 +24,7 @@ interface PuttSessionDao {
     ORDER BY date DESC
 """)
     suspend fun allSessionsAt(d: Int): List<PuttSession>
+
+    @Delete
+    suspend fun deleteSession(session: PuttSession)
 } 
