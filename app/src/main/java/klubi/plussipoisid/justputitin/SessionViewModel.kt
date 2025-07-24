@@ -252,6 +252,20 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             DistanceStats(d, tries, made, made.toDouble() / tries)
         }
 
+    suspend fun getLastSession(distance: Int, style: String): PuttSession? {
+        val db = PuttDatabase.getDatabase(getApplication())
+        val all = db.puttSessionDao().getSessionsByDistance(distance)
+        return all.filter { it.style == style }.maxByOrNull { it.date }
+    }
+
+    suspend fun getAverageHitRate(distance: Int, style: String): Double? {
+        val db = PuttDatabase.getDatabase(getApplication())
+        val all = db.puttSessionDao().getSessionsByDistance(distance).filter { it.style == style }
+        val totalPutts = all.sumOf { it.numPutts }
+        val totalMade = all.sumOf { it.madePutts }
+        return if (totalPutts > 0) totalMade.toDouble() / totalPutts else null
+    }
+
     fun deleteSession(session: PuttSession) {
         val db = PuttDatabase.getDatabase(getApplication())
         viewModelScope.launch {

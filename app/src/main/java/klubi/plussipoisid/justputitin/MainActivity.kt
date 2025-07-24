@@ -71,6 +71,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 
 @Composable
@@ -497,6 +500,21 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
     val context = LocalContext.current
     val soundOn by viewModel.soundOn.collectAsState()
 
+    // Add state for last session and average hitrate
+    val lastSessionHitrate = remember { mutableStateOf<Int?>(null) }
+    val averageHitrate = remember { mutableStateOf<Double?>(null) }
+
+    LaunchedEffect(distance, selectedStyle.value) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val last = viewModel.getLastSession(distance, selectedStyle.value)
+            val avg = viewModel.getAverageHitRate(distance, selectedStyle.value)
+            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                lastSessionHitrate.value = last?.let { if (it.numPutts > 0) (it.madePutts * 100 / it.numPutts) else null }
+                averageHitrate.value = avg
+            }
+        }
+    }
+
     // Intercept system back and go to main menu
     BackHandler {
         navController.popBackStack("main_menu", inclusive = false)
@@ -569,6 +587,15 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                             val puttsMade = successful.value
                             viewModel.saveSession(distance, numPutts, puttsMade, selectedStyle.value)
                             saved.value = true
+                            // Update last/average hitrate after saving
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                val last = viewModel.getLastSession(distance, selectedStyle.value)
+                                val avg = viewModel.getAverageHitRate(distance, selectedStyle.value)
+                                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    lastSessionHitrate.value = last?.let { if (it.numPutts > 0) (it.madePutts * 100 / it.numPutts) else null }
+                                    averageHitrate.value = avg
+                                }
+                            }
                             if (puttsMade == numPutts && numPutts > 0 && soundOn) {
                                 playKawaiiSound(context)
                             }
@@ -606,6 +633,15 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Show last attempt and average hitrate
+                if (lastSessionHitrate.value != null) {
+                    Text("Last attempt hit rate: ${lastSessionHitrate.value}%", style = MaterialTheme.typography.bodyMedium)
+                }
+                if (averageHitrate.value != null) {
+                    Text("Average hit rate: ${(averageHitrate.value!! * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Sound effects toggle
                 Row(verticalAlignment = Alignment.CenterVertically) {
