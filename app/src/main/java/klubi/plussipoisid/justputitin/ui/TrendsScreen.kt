@@ -26,16 +26,14 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 fun TrendsScreen() {
     val viewModel: SessionViewModel = viewModel()
-    val distances = viewModel.distances.collectAsState().value
     val stylesForDistance = viewModel.stylesForDistance.collectAsState().value
     val sessions = viewModel.sessions.collectAsState().value
     val historyOptions = listOf("Last week", "Last month", "Last year", "All time")
-    val expandedDistance = remember { mutableStateOf(false) }
     val expandedRange = remember { mutableStateOf(false) }
-    val expandedStyle = remember { mutableStateOf(false) }
     val selectedDistance = remember { mutableStateOf<Int?>(null) }
     val selectedRange = remember { mutableStateOf(historyOptions[0]) }
     val selectedStyle = remember { mutableStateOf("All") }
+    val expandedStyle = remember { mutableStateOf(false) }
 
     // Track previous distance to only reset style when distance actually changes
     var previousDistance by remember { mutableStateOf<Int?>(null) }
@@ -74,20 +72,22 @@ fun TrendsScreen() {
     }
 
     LaunchedEffect(Unit) {
-        viewModel.loadDistances()
+        viewModel.loadAllStyles()
     }
-    LaunchedEffect(selectedDistance.value) {
-        selectedDistance.value?.let { viewModel.loadStylesForDistance(it) }
+    LaunchedEffect(selectedRange.value) {
+        // selectedDistance.value?.let { viewModel.loadStylesForDistance(it) } // Removed distance picker
     }
-    // Remove default selectedDistance logic
     // Only load sessions when all filters are selected
-    LaunchedEffect(selectedDistance.value, selectedStyle.value, selectedRange.value) {
-        if (selectedDistance.value != null) {
-            viewModel.loadSessionsForDistanceAndStyle(
-                selectedDistance.value!!,
-                if (selectedStyle.value == "All") null else selectedStyle.value,
-                selectedRange.value
-            )
+    LaunchedEffect(selectedRange.value) {
+        // selectedDistance.value?.let { viewModel.loadSessionsForDistanceAndStyle(it, if (selectedStyle.value == "All") null else selectedStyle.value, selectedRange.value) } // Removed distance picker
+        if (selectedRange.value != null) {
+            viewModel.loadSessionsByDateRange(
+                if (customRange.value != null) customRange.value!!.first else 0L,
+                if (customRange.value != null) customRange.value!!.second else System.currentTimeMillis()
+            ) { sessions ->
+                sessionsForRange.value = sessions
+                hitRates.value = viewModel.getHitRatePerDistance(sessions)
+            }
         }
     }
 
@@ -113,69 +113,10 @@ fun TrendsScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Hit Rate Trends", style = MaterialTheme.typography.titleLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold), modifier = Modifier.padding(bottom = 16.dp))
-        if (distances.isEmpty()) {
+        if (/*distances.isEmpty()*/ false) {
             Text("No recorded distances yet. Complete a session to see trends.", color = MaterialTheme.colorScheme.error)
         } else {
-            Box {
-                Button(
-                    onClick = { expandedDistance.value = true },
-                    enabled = distances.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth(0.7f)
-                ) {
-                    Text(selectedDistance.value?.toString() ?: "Pick Distance")
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Pick Distance")
-                }
-                DropdownMenu(
-                    expanded = expandedDistance.value,
-                    onDismissRequest = { expandedDistance.value = false },
-                    modifier = Modifier.fillMaxWidth(0.7f)
-                ) {
-                    distances.forEach { d ->
-                        DropdownMenuItem(
-                            text = { Text(d.toString()) },
-                            onClick = {
-                                selectedDistance.value = d
-                                expandedDistance.value = false
-                                // Style reset handled by LaunchedEffect
-                            }
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Box {
-                Button(
-                    onClick = { expandedStyle.value = true },
-                    enabled = stylesForDistance.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth(0.7f)
-                ) {
-                    Text(selectedStyle.value)
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Pick Style")
-                }
-                DropdownMenu(
-                    expanded = expandedStyle.value,
-                    onDismissRequest = { expandedStyle.value = false },
-                    modifier = Modifier.fillMaxWidth(0.7f)
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("All") },
-                        onClick = {
-                            selectedStyle.value = "All"
-                            expandedStyle.value = false
-                        }
-                    )
-                    stylesForDistance.forEach { style ->
-                        DropdownMenuItem(
-                            text = { Text(style) },
-                            onClick = {
-                                selectedStyle.value = style
-                                expandedStyle.value = false
-                            }
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
+            // Distance picker removed
             Box {
                 Button(
                     onClick = { expandedRange.value = true },
@@ -221,14 +162,51 @@ fun TrendsScreen() {
                 val end = java.text.SimpleDateFormat("yyyy-MM-dd").format(java.util.Date(customRange.value!!.second))
                 Text("Custom: $start to $end", style = MaterialTheme.typography.bodySmall)
             }
+            if (stylesForDistance.isNotEmpty()) {
+                Box {
+                    Button(
+                        onClick = { expandedStyle.value = true },
+                        enabled = stylesForDistance.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    ) {
+                        Text(selectedStyle.value)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Pick Style")
+                    }
+                    DropdownMenu(
+                        expanded = expandedStyle.value,
+                        onDismissRequest = { expandedStyle.value = false },
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("All") },
+                            onClick = {
+                                selectedStyle.value = "All"
+                                expandedStyle.value = false
+                            }
+                        )
+                        stylesForDistance.forEach { style ->
+                            DropdownMenuItem(
+                                text = { Text(style) },
+                                onClick = {
+                                    selectedStyle.value = style
+                                    expandedStyle.value = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
         Spacer(modifier = Modifier.height(24.dp))
         // Data loading for chart
-        LaunchedEffect(selectedRange.value, customRange.value) {
+        LaunchedEffect(selectedRange.value, customRange.value, selectedStyle.value) {
+            val styleFilter = if (selectedStyle.value == "All") null else selectedStyle.value
             if (customRange.value != null) {
                 viewModel.loadSessionsByDateRange(customRange.value!!.first, customRange.value!!.second) { sessions ->
-                    sessionsForRange.value = sessions
-                    hitRates.value = viewModel.getHitRatePerDistance(sessions)
+                    val filtered = if (styleFilter == null) sessions else sessions.filter { it.style == styleFilter }
+                    sessionsForRange.value = filtered
+                    hitRates.value = viewModel.getHitRatePerDistance(filtered)
                 }
             } else {
                 // Use default periods
@@ -240,12 +218,13 @@ fun TrendsScreen() {
                     else -> 0L to now
                 }
                 viewModel.loadSessionsByDateRange(start, end) { sessions ->
-                    sessionsForRange.value = sessions
-                    hitRates.value = viewModel.getHitRatePerDistance(sessions)
+                    val filtered = if (styleFilter == null) sessions else sessions.filter { it.style == styleFilter }
+                    sessionsForRange.value = filtered
+                    hitRates.value = viewModel.getHitRatePerDistance(filtered)
                 }
             }
         }
-        if (hitRates.value.isEmpty() && distances.isNotEmpty()) {
+        if (hitRates.value.isEmpty()) {
             Text("No sessions found for this period.")
         } else if (hitRates.value.isNotEmpty()) {
             // Show line chart: x = distance, y = hit rate

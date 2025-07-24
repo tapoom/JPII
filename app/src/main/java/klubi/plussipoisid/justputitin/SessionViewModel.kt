@@ -127,6 +127,13 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun loadAllStyles() {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            _stylesForDistance.value = db.puttSessionDao().getAllSessions().map { it.style }.distinct().sorted()
+        }
+    }
+
     fun loadSessionsForDistanceAndRange(distance: Int, range: String) {
         val db = PuttDatabase.getDatabase(getApplication())
         val now = System.currentTimeMillis()
