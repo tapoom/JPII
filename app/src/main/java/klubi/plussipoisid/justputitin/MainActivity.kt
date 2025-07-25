@@ -191,7 +191,7 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrend
             tint = Color.Unspecified
         )
         Text("Putting Rating: $puttingRating", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 16.dp))
-        Text("Just put it in!", modifier = Modifier.padding(bottom = 32.dp))
+        Text("Just putt it in!", modifier = Modifier.padding(bottom = 32.dp))
         Button(onClick = onStartSession, modifier = Modifier.fillMaxWidth()) {
             Text("New session")
         }
@@ -569,26 +569,26 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                     Icon(
                         imageVector = Icons.Default.ArrowDropDown,
                         contentDescription = "Distance",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = Color(0xffee632c),
                         modifier = Modifier.size(32.dp)
                     )
                     Text(
                         text = "$distance m",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xffee632c),
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
                     Spacer(modifier = Modifier.width(24.dp))
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = "Throws",
-                        tint = MaterialTheme.colorScheme.secondary,
+                        tint = Color(0xffee632c),
                         modifier = Modifier.size(28.dp)
                     )
                     Text(
                         text = "$numPutts throws",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = Color(0xffee632c),
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
                 }
@@ -829,7 +829,7 @@ fun SessionSetupScreen(onStartSession: (Int, Int, String) -> Unit) {
 @Composable
 fun NumberPickerRow(range: IntRange, selected: Int?, onSelected: (Int) -> Unit) {
     val itemSize = 56.dp
-    val selectedItemSize = 72.dp
+    val selectedItemSize = 60.dp
     val contentPadding = (itemSize / 2)
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -856,11 +856,11 @@ fun NumberPickerRow(range: IntRange, selected: Int?, onSelected: (Int) -> Unit) 
         items(range.toList()) { value ->
             val isSelected = selected != null && value == selected
             val animatedColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.LightGray,
+                targetValue = if (isSelected) Color(0xffee632c) else Color.LightGray,
                 animationSpec = tween(durationMillis = 300), label = ""
             )
             val animatedElevation by animateDpAsState(
-                targetValue = if (isSelected) 16.dp else 2.dp,
+                targetValue = if (isSelected) 12.dp else 2.dp,
                 animationSpec = tween(durationMillis = 300), label = ""
             )
             Card(
@@ -869,14 +869,14 @@ fun NumberPickerRow(range: IntRange, selected: Int?, onSelected: (Int) -> Unit) 
                 elevation = CardDefaults.cardElevation(defaultElevation = animatedElevation),
                 modifier = Modifier
                     .size(if (isSelected) selectedItemSize else itemSize)
-                    .shadow(if (isSelected) 12.dp else 2.dp, CircleShape)
+                    .shadow(if (isSelected) 16.dp else 2.dp, CircleShape)
                     .clickable { onSelected(value) }
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Text(
                         text = value.toString(),
                         style = if (isSelected) MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold) else MaterialTheme.typography.bodyLarge,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.DarkGray
+                        color = Color(0xff022f33)
                     )
                 }
             }
