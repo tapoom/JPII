@@ -911,35 +911,105 @@ fun TrainingSetupScreen(viewModel: SessionViewModel, onStartTraining: (TrainingR
                     textAlign = TextAlign.Center
                 )
                 
-                Text("Distance Range", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                //Text("Distance Range", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                Spacer(modifier = Modifier.height(8.dp))
+                /*
+                Text(
+                    text = "Select the range of distances for your training session",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                 */
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Min Distance", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                        NumberPickerRow(
+                            range = 1..29,
+                            selected = minDistance,
+                            onSelected = { 
+                                viewModel.setMinDistance(it)
+                                // Ensure max distance is at least one more than min distance
+                                if (maxDistance <= it) {
+                                    viewModel.setMaxDistance(it + 1)
+                                }
+                            }
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Min Distance", style = MaterialTheme.typography.bodyMedium)
+                        Text("Max Distance", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
                         NumberPickerRow(
-                            range = 1..15,
-                            selected = minDistance,
-                            onSelected = { viewModel.setMinDistance(it) }
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Max Distance", style = MaterialTheme.typography.bodyMedium)
-                        NumberPickerRow(
-                            range = minDistance..20,
+                            range = (minDistance + 1)..30,
                             selected = maxDistance,
-                            onSelected = { viewModel.setMaxDistance(it) }
+                            onSelected = {
+                                viewModel.setMaxDistance(it)
+                            }
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                // Show selected range
+                /*
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (maxDistance > minDistance) 
+                            MaterialTheme.colorScheme.primaryContainer 
+                        else 
+                            MaterialTheme.colorScheme.errorContainer
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Range",
+                            tint = if (maxDistance > minDistance) 
+                                MaterialTheme.colorScheme.onPrimaryContainer 
+                            else 
+                                MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (maxDistance > minDistance) 
+                                "Training Range: ${minDistance}-${maxDistance}m"
+                            else 
+                                "Invalid Range: Max must be > Min",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                            color = if (maxDistance > minDistance) 
+                                MaterialTheme.colorScheme.onPrimaryContainer 
+                            else 
+                                MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+
+                 */
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Max Putts per Distance", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
                 Spacer(modifier = Modifier.height(8.dp))
                 NumberPickerRow(
-                    range = 1..15,
+                    range = 3..15,
                     selected = maxPuttsPerDistance,
                     onSelected = { viewModel.setMaxPuttsPerDistance(it) }
                 )
@@ -986,7 +1056,7 @@ fun TrainingSetupScreen(viewModel: SessionViewModel, onStartTraining: (TrainingR
                         android.util.Log.d("TrainingSetup", "Created training run: $trainingRun")
                         onStartTraining(trainingRun)
                     },
-                    enabled = minDistance <= maxDistance,
+                    enabled = maxDistance > minDistance,
                     modifier = Modifier.fillMaxWidth(0.7f)
                 ) {
                     Text("Start Training Run")
@@ -1134,6 +1204,12 @@ fun TrainingSessionScreen(viewModel: SessionViewModel, onComplete: () -> Unit, n
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
+                        } else {
+                            Text(
+                                text = "Step hit rate: na",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
                 }
@@ -1164,6 +1240,12 @@ fun TrainingSessionScreen(viewModel: SessionViewModel, onComplete: () -> Unit, n
                             val overallHitRate = (currentTrainingRun!!.madePutts * 100 / currentTrainingRun!!.completedPutts)
                             Text(
                                 text = "Overall hit rate: $overallHitRate%",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        } else {
+                            Text(
+                                text = "Overall hit rate: na",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )

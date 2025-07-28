@@ -123,10 +123,11 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         // Ensure we have at least one step
         if (distances.isNotEmpty()) {
             // Randomly select distances and number of putts
-            for (i in 0 until 20) { // Limit to 20 steps to avoid infinite loops
+            // Generate random sessions
+            for (i in 0 until ((maxDist - minDist) * 2)) {
                 if (totalPutts >= 50) break // Limit total putts
                 val distance = distances.random()
-                val numPutts = Random.nextInt(1, maxPutts + 1)
+                val numPutts = Random.nextInt(2, maxPutts + 1)
                 steps.add(TrainingStep(distance = distance, numPutts = numPutts))
                 totalPutts += numPutts
             }
