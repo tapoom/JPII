@@ -127,6 +127,13 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun loadAllStyles() {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            _stylesForDistance.value = db.puttSessionDao().getAllSessions().map { it.style }.distinct().sorted()
+        }
+    }
+
     fun loadSessionsForDistanceAndRange(distance: Int, range: String) {
         val db = PuttDatabase.getDatabase(getApplication())
         val now = System.currentTimeMillis()
@@ -156,6 +163,28 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             }
             _sessions.value = filtered
         }
+    }
+
+    // New: Load sessions for all distances in a custom date range
+    fun loadSessionsByDateRange(startDate: Long, endDate: Long, onResult: (List<PuttSession>) -> Unit) {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            val sessions = db.puttSessionDao().getSessionsByDateRange(startDate, endDate)
+            onResult(sessions)
+        }
+    }
+
+    // New: Aggregate hit rate per distance for a given date range (1-30m)
+    fun getHitRatePerDistance(sessions: List<PuttSession>): List<Pair<Int, Float>> {
+        val result = mutableListOf<Pair<Int, Float>>()
+        for (distance in 1..30) {
+            val filtered = sessions.filter { it.distance == distance }
+            val totalPutts = filtered.sumOf { it.numPutts }
+            val totalMade = filtered.sumOf { it.madePutts }
+            val hitRate = if (totalPutts > 0) (totalMade * 100f / totalPutts) else 0f
+            result.add(distance to hitRate)
+        }
+        return result
     }
 
     // Calculate putt rating
@@ -214,12 +243,39 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         minPutts: Int = 10,
         maxPutts: Int = 30
     ): List<DistanceStats> =
-        (3..15).mapNotNull { d ->
+        (3..15).map { d ->
             val s = lastSessionsForPuttRange(d, minPutts, maxPutts)
-            if (s.isEmpty()) return@mapNotNull null
-
-            val made  = s.sumOf { it.madePutts }
-            val tries = s.sumOf { it.numPutts }
-            DistanceStats(d, tries, made, made.toDouble() / tries)
+            if (s.isEmpty()) {
+                // No data for this distance, count as 0%
+                DistanceStats(d, minPutts, 0, 0.0)
+            } else {
+                val made  = s.sumOf { it.madePutts }
+                val tries = s.sumOf { it.numPutts }
+                DistanceStats(d, tries, made, made.toDouble() / tries)
+            }
         }
+
+    suspend fun getLastSession(distance: Int, style: String): PuttSession? {
+        val db = PuttDatabase.getDatabase(getApplication())
+        val all = db.puttSessionDao().getSessionsByDistance(distance)
+        return all.filter { it.style == style }.maxByOrNull { it.date }
+    }
+
+    suspend fun getAverageHitRate(distance: Int, style: String): Double? {
+        val db = PuttDatabase.getDatabase(getApplication())
+        val all = db.puttSessionDao().getSessionsByDistance(distance).filter { it.style == style }
+        val totalPutts = all.sumOf { it.numPutts }
+        val totalMade = all.sumOf { it.madePutts }
+        return if (totalPutts > 0) totalMade.toDouble() / totalPutts else null
+    }
+
+    fun deleteSession(session: PuttSession) {
+        val db = PuttDatabase.getDatabase(getApplication())
+        viewModelScope.launch {
+            db.puttSessionDao().deleteSession(session)
+            loadSessionsForDistance(session.distance)
+            loadPuttingRating()
+            loadAverageHitRate(session.distance)
+        }
+    }
 } 

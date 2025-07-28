@@ -30,6 +30,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,9 +68,11 @@ import klubi.plussipoisid.justputitin.ui.TrendsScreen
 import android.media.MediaPlayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
-
+import kotlinx.coroutines.withContext
 
 @Composable
 fun FadingAppNavHost() {
@@ -89,7 +94,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            JPIITheme {
+            JPIITheme(dynamicColor = false) {
                 FadingAppNavHost()
             }
         }
@@ -186,7 +191,7 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrend
             tint = Color.Unspecified
         )
         Text("Putting Rating: $puttingRating", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 16.dp))
-        Text("Just put it in!", modifier = Modifier.padding(bottom = 32.dp))
+        Text("Just putt it in!", modifier = Modifier.padding(bottom = 32.dp))
         Button(onClick = onStartSession, modifier = Modifier.fillMaxWidth()) {
             Text("New session")
         }
@@ -281,7 +286,7 @@ fun StatisticsScreen() {
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Box {
                 Button(
                     onClick = { expandedStyle.value = true },
@@ -314,7 +319,7 @@ fun StatisticsScreen() {
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Box {
                 Button(
                     onClick = { expandedRange.value = true },
@@ -340,10 +345,11 @@ fun StatisticsScreen() {
                 }
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         if (sessions.isEmpty() && distances.isNotEmpty()) {
             Text("No sessions found for this distance, style, and range.")
         } else if (sessions.isNotEmpty()) {
+            var showDeleteDialog by remember { mutableStateOf(false) }
             val lastSession = sessions.first()
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(lastSession.date))
             val hitRate = if (lastSession.numPutts > 0) (lastSession.madePutts * 100 / lastSession.numPutts) else 0
@@ -352,23 +358,54 @@ fun StatisticsScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Last Session", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("$date", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("Throws: ${lastSession.numPutts}")
-                    Text("Hits: ${lastSession.madePutts}")
-                    Text("Hit Rate: $hitRate%", fontWeight = FontWeight.Bold)
-                    Text("Style: ${lastSession.style}")
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Last Session - $date", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("Throws: ${lastSession.numPutts} / Hits: ${lastSession.madePutts}")
+                        Text("Style: ${lastSession.style}")
+                    }
+                    Text("$hitRate%", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                    IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.align(Alignment.CenterVertically)) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete Session",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            if (showDeleteDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = { Text("Delete Session") },
+                    text = { Text("Are you sure you want to delete this session?") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            viewModel.deleteSession(lastSession)
+                            showDeleteDialog = false
+                        }) {
+                            Text("Delete")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             BarChart(sessions = sessions)
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(sessions.drop(1)) { session ->
+                    var showDeleteDialog by remember { mutableStateOf(false) }
                     val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(session.date))
                     val hitRate = if (session.numPutts > 0) (session.madePutts * 100 / session.numPutts) else 0
                     Card(
@@ -382,11 +419,37 @@ fun StatisticsScreen() {
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("$date", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text("Throws: ${session.numPutts}")
-                                Text("Hits: ${session.madePutts}")
+                                Text("Throws: ${session.numPutts} / Hits: ${session.madePutts}")
                                 Text("Style: ${session.style}")
                             }
                             Text("$hitRate%", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                            IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.align(Alignment.CenterVertically)) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete Session",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        if (showDeleteDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showDeleteDialog = false },
+                                title = { Text("Delete Session") },
+                                text = { Text("Are you sure you want to delete this session?") },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        viewModel.deleteSession(session)
+                                        showDeleteDialog = false
+                                    }) {
+                                        Text("Delete")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDeleteDialog = false }) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -399,14 +462,14 @@ fun StatisticsScreen() {
 fun BarChart(sessions: List<PuttSession>) {
     val maxRate = (sessions.maxOfOrNull { if (it.numPutts > 0) (it.madePutts * 100 / it.numPutts) else 0 } ?: 100).coerceAtLeast(100)
     val barWidth = 32.dp
-    val chartHeight = 160.dp
+    val chartHeight = 80.dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(chartHeight)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         sessions.forEach { session ->
             val hitRate = if (session.numPutts > 0) (session.madePutts * 100 / session.numPutts) else 0
@@ -419,7 +482,7 @@ fun BarChart(sessions: List<PuttSession>) {
                     .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                Text("$hitRate%", color = MaterialTheme.colorScheme.onPrimary, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+                Text("$hitRate%", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, modifier = Modifier.padding(bottom = 4.dp))
             }
         }
     }
@@ -434,6 +497,21 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
     val selectedStyle = remember { mutableStateOf(style) }
     val context = LocalContext.current
     val soundOn by viewModel.soundOn.collectAsState()
+
+    // Add state for last session and average hitrate
+    val lastSessionHitrate = remember { mutableStateOf<Int?>(null) }
+    val averageHitrate = remember { mutableStateOf<Double?>(null) }
+
+    LaunchedEffect(distance, selectedStyle.value) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val last = viewModel.getLastSession(distance, selectedStyle.value)
+            val avg = viewModel.getAverageHitRate(distance, selectedStyle.value)
+            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                lastSessionHitrate.value = last?.let { if (it.numPutts > 0) (it.madePutts * 100 / it.numPutts) else null }
+                averageHitrate.value = avg
+            }
+        }
+    }
 
     // Intercept system back and go to main menu
     BackHandler {
@@ -475,8 +553,46 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                     modifier = Modifier.padding(bottom = 16.dp),
                     textAlign = TextAlign.Center
                 )
-                Text("Distance: $distance meters", style = MaterialTheme.typography.bodyLarge)
-                Text("Throws: $numPutts", style = MaterialTheme.typography.bodyLarge)
+                // Make distance and throws more prominent
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(vertical = 12.dp, horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Distance",
+                        tint = Color(0xffee632c),
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Text(
+                        text = "$distance m",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = Color(0xffee632c),
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                    Spacer(modifier = Modifier.width(24.dp))
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Throws",
+                        tint = Color(0xffee632c),
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Text(
+                        text = "$numPutts throws",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = Color(0xffee632c),
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text("Style: " + selectedStyle.value, style = MaterialTheme.typography.bodyMedium)
@@ -507,6 +623,15 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                             val puttsMade = successful.value
                             viewModel.saveSession(distance, numPutts, puttsMade, selectedStyle.value)
                             saved.value = true
+                            // Update last/average hitrate after saving
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                val last = viewModel.getLastSession(distance, selectedStyle.value)
+                                val avg = viewModel.getAverageHitRate(distance, selectedStyle.value)
+                                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    lastSessionHitrate.value = last?.let { if (it.numPutts > 0) (it.madePutts * 100 / it.numPutts) else null }
+                                    averageHitrate.value = avg
+                                }
+                            }
                             if (puttsMade == numPutts && numPutts > 0 && soundOn) {
                                 playKawaiiSound(context)
                             }
@@ -544,6 +669,15 @@ fun ResultEntryScreen(distance: Int, numPutts: Int, onRepeat: () -> Unit, onAdju
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Show last attempt and average hitrate
+                if (lastSessionHitrate.value != null) {
+                    Text("Last attempt hit rate: ${lastSessionHitrate.value}%", style = MaterialTheme.typography.bodyMedium)
+                }
+                if (averageHitrate.value != null) {
+                    Text("Average hit rate: ${(averageHitrate.value!! * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Sound effects toggle
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -695,7 +829,7 @@ fun SessionSetupScreen(onStartSession: (Int, Int, String) -> Unit) {
 @Composable
 fun NumberPickerRow(range: IntRange, selected: Int?, onSelected: (Int) -> Unit) {
     val itemSize = 56.dp
-    val selectedItemSize = 72.dp
+    val selectedItemSize = 60.dp
     val contentPadding = (itemSize / 2)
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -722,11 +856,11 @@ fun NumberPickerRow(range: IntRange, selected: Int?, onSelected: (Int) -> Unit) 
         items(range.toList()) { value ->
             val isSelected = selected != null && value == selected
             val animatedColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.LightGray,
+                targetValue = if (isSelected) Color(0xffee632c) else Color.LightGray,
                 animationSpec = tween(durationMillis = 300), label = ""
             )
             val animatedElevation by animateDpAsState(
-                targetValue = if (isSelected) 16.dp else 2.dp,
+                targetValue = if (isSelected) 12.dp else 2.dp,
                 animationSpec = tween(durationMillis = 300), label = ""
             )
             Card(
@@ -735,14 +869,14 @@ fun NumberPickerRow(range: IntRange, selected: Int?, onSelected: (Int) -> Unit) 
                 elevation = CardDefaults.cardElevation(defaultElevation = animatedElevation),
                 modifier = Modifier
                     .size(if (isSelected) selectedItemSize else itemSize)
-                    .shadow(if (isSelected) 12.dp else 2.dp, CircleShape)
+                    .shadow(if (isSelected) 16.dp else 2.dp, CircleShape)
                     .clickable { onSelected(value) }
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Text(
                         text = value.toString(),
                         style = if (isSelected) MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold) else MaterialTheme.typography.bodyLarge,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.DarkGray
+                        color = Color(0xff022f33)
                     )
                 }
             }

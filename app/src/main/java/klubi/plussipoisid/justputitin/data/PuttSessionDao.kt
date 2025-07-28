@@ -3,6 +3,7 @@ package klubi.plussipoisid.justputitin.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Delete
 
 @Dao
 interface PuttSessionDao {
@@ -23,4 +24,13 @@ interface PuttSessionDao {
     ORDER BY date DESC
 """)
     suspend fun allSessionsAt(d: Int): List<PuttSession>
+
+    @Query("SELECT * FROM putt_sessions WHERE distance = :distance AND date BETWEEN :startDate AND :endDate ORDER BY date DESC")
+    suspend fun getSessionsByDistanceAndDateRange(distance: Int, startDate: Long, endDate: Long): List<PuttSession>
+
+    @Query("SELECT * FROM putt_sessions WHERE date BETWEEN :startDate AND :endDate ORDER BY distance ASC, date DESC")
+    suspend fun getSessionsByDateRange(startDate: Long, endDate: Long): List<PuttSession>
+
+    @Delete
+    suspend fun deleteSession(session: PuttSession)
 } 
