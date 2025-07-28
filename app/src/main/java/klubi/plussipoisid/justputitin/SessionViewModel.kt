@@ -243,13 +243,16 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         minPutts: Int = 10,
         maxPutts: Int = 30
     ): List<DistanceStats> =
-        (3..15).mapNotNull { d ->
+        (3..15).map { d ->
             val s = lastSessionsForPuttRange(d, minPutts, maxPutts)
-            if (s.isEmpty()) return@mapNotNull null
-
-            val made  = s.sumOf { it.madePutts }
-            val tries = s.sumOf { it.numPutts }
-            DistanceStats(d, tries, made, made.toDouble() / tries)
+            if (s.isEmpty()) {
+                // No data for this distance, count as 0%
+                DistanceStats(d, minPutts, 0, 0.0)
+            } else {
+                val made  = s.sumOf { it.madePutts }
+                val tries = s.sumOf { it.numPutts }
+                DistanceStats(d, tries, made, made.toDouble() / tries)
+            }
         }
 
     suspend fun getLastSession(distance: Int, style: String): PuttSession? {
