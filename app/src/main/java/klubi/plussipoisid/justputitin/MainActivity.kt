@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            JPIITheme {
+            JPIITheme(dynamicColor = false) {
                 FadingAppNavHost()
             }
         }

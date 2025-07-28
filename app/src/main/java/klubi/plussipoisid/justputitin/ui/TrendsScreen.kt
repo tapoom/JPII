@@ -1,6 +1,5 @@
 package klubi.plussipoisid.justputitin.ui
 
-import android.widget.FrameLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -47,8 +46,6 @@ fun TrendsScreen() {
 
     val customRange = remember { mutableStateOf<Pair<Long, Long>?>(null) }
     val showDatePicker = remember { mutableStateOf(false) }
-    val isPickingStart = remember { mutableStateOf(true) }
-    val calendar = Calendar.getInstance()
     val context = LocalContext.current
     val sessionsForRange = remember { mutableStateOf<List<klubi.plussipoisid.justputitin.data.PuttSession>>(emptyList()) }
     val hitRates = remember { mutableStateOf<List<Pair<Int, Float>>>(emptyList()) }
@@ -60,13 +57,14 @@ fun TrendsScreen() {
             context,
             { _, year, month, day ->
                 val cal = Calendar.getInstance()
-                cal.set(year, month, day, 0, 0, 0)
-                val time = cal.timeInMillis
                 if (isStart) {
-                    customRange.value = time to (customRange.value?.second ?: time)
+                    cal.set(year, month, day, 0, 0, 0)
                 } else {
-                    customRange.value = (customRange.value?.first ?: time) to time
+                    cal.set(year, month, day, 23, 59, 59)
                 }
+                val time = cal.timeInMillis
+                val (start, end) = customRange.value ?: (time to time)
+                customRange.value = if (isStart) time to end else start to time
             },
             now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH)
         ).show()
@@ -143,8 +141,9 @@ fun TrendsScreen() {
                         )
                     }
                     DropdownMenuItem(
-                        text = { Text("Custom Range") },
+                        text = { Text("Custom range") },
                         onClick = {
+                            selectedRange.value = "Custom range"
                             expandedRange.value = false
                             showDatePicker.value = true
                         }
