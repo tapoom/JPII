@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [PuttSession::class], version = 1)
+@Database(entities = [PuttSession::class, TrainingRun::class], version = 2)
 abstract class PuttDatabase : RoomDatabase() {
     abstract fun puttSessionDao(): PuttSessionDao
 
@@ -19,7 +19,9 @@ abstract class PuttDatabase : RoomDatabase() {
                     context.applicationContext,
                     PuttDatabase::class.java,
                     "putt_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

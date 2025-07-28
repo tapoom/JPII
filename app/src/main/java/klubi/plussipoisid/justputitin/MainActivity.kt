@@ -73,6 +73,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.withContext
+import klubi.plussipoisid.justputitin.data.TrainingRun
+import androidx.compose.material3.LinearProgressIndicator
 
 @Composable
 fun FadingAppNavHost() {
@@ -106,6 +108,11 @@ fun AppNavHost() {
     val navController = rememberNavController()
     val viewModel: SessionViewModel = viewModel()
     val currentScreen = remember { mutableStateOf("main_menu") }
+    
+    // Debug logging for ViewModel instance
+    LaunchedEffect(Unit) {
+        android.util.Log.d("AppNavHost", "ViewModel instance: $viewModel")
+    }
     NavHost(
         navController = navController,
         startDestination = "main_menu",
@@ -116,7 +123,9 @@ fun AppNavHost() {
             Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
                 AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
                     MainMenuScreen(
+                        viewModel = viewModel,
                         onStartSession = { navController.navigate("session_setup") },
+                        onStartTraining = { navController.navigate("training_setup") },
                         onCheckStats = { navController.navigate("statistics") },
                         onTrends = { navController.navigate("trends") }
                     )
@@ -130,6 +139,31 @@ fun AppNavHost() {
                     SessionSetupScreen(onStartSession = { distance, numPutts, style ->
                         navController.navigate("result_entry/$distance/$numPutts/$style")
                     })
+                }
+            }
+        }
+        composable("training_setup") {
+            currentScreen.value = "training_setup"
+            Surface(color = MaterialTheme.colorScheme.surfaceVariant, tonalElevation = 4.dp) {
+                AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
+                    TrainingSetupScreen(
+                        viewModel = viewModel,
+                        onStartTraining = { trainingRun ->
+                            navController.navigate("training_session")
+                        }
+                    )
+                }
+            }
+        }
+        composable("training_session") {
+            currentScreen.value = "training_session"
+            Surface(color = MaterialTheme.colorScheme.primaryContainer, tonalElevation = 8.dp) {
+                AnimatedVisibility(visible = true, enter = fadeIn(), exit = fadeOut()) {
+                    TrainingSessionScreen(
+                        viewModel = viewModel,
+                        onComplete = { navController.popBackStack("main_menu", inclusive = false) },
+                        navController = navController
+                    )
                 }
             }
         }
@@ -169,8 +203,7 @@ fun AppNavHost() {
 }
 
 @Composable
-fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrends: () -> Unit) {
-    val viewModel: SessionViewModel = viewModel()
+fun MainMenuScreen(viewModel: SessionViewModel, onStartSession: () -> Unit, onStartTraining: () -> Unit, onCheckStats: () -> Unit, onTrends: () -> Unit) {
     val puttingRating by viewModel.puttingRating.collectAsState()
     LaunchedEffect(Unit) {
         viewModel.loadPuttingRating()
@@ -195,11 +228,15 @@ fun MainMenuScreen(onStartSession: () -> Unit, onCheckStats: () -> Unit, onTrend
         Button(onClick = onStartSession, modifier = Modifier.fillMaxWidth()) {
             Text("New session")
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onStartTraining, modifier = Modifier.fillMaxWidth()) {
+            Text("Training Run")
+        }
+        Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onCheckStats, modifier = Modifier.fillMaxWidth()) {
             Text("History")
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onTrends, modifier = Modifier.fillMaxWidth()) {
             Text("Line Trends")
         }
@@ -820,6 +857,377 @@ fun SessionSetupScreen(onStartSession: (Int, Int, String) -> Unit) {
                     modifier = Modifier.fillMaxWidth(0.7f)
                 ) {
                     Text("Start Session")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TrainingSetupScreen(viewModel: SessionViewModel, onStartTraining: (TrainingRun) -> Unit) {
+    val minDistance by viewModel.minDistance.collectAsState()
+    val maxDistance by viewModel.maxDistance.collectAsState()
+    val maxPuttsPerDistance by viewModel.maxPuttsPerDistance.collectAsState()
+    val selectedStyle by viewModel.selectedStyle.collectAsState()
+    val expandedStyle = remember { mutableStateOf(false) }
+    
+    // Debug logging
+    LaunchedEffect(Unit) {
+        android.util.Log.d("TrainingSetup", "Training setup screen loaded")
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        MaterialTheme.colorScheme.surface
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            shape = RoundedCornerShape(32.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(0.95f)
+                .wrapContentHeight()
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(32.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Training Run Setup",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    textAlign = TextAlign.Center
+                )
+                
+                Text("Distance Range", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Min Distance", style = MaterialTheme.typography.bodyMedium)
+                        NumberPickerRow(
+                            range = 1..15,
+                            selected = minDistance,
+                            onSelected = { viewModel.setMinDistance(it) }
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Max Distance", style = MaterialTheme.typography.bodyMedium)
+                        NumberPickerRow(
+                            range = minDistance..20,
+                            selected = maxDistance,
+                            onSelected = { viewModel.setMaxDistance(it) }
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                Text("Max Putts per Distance", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                Spacer(modifier = Modifier.height(8.dp))
+                NumberPickerRow(
+                    range = 1..15,
+                    selected = maxPuttsPerDistance,
+                    onSelected = { viewModel.setMaxPuttsPerDistance(it) }
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                Text("Putting Style", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                Box {
+                    Button(
+                        onClick = { expandedStyle.value = true },
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    ) {
+                        Text(selectedStyle)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Pick Style")
+                    }
+                    DropdownMenu(
+                        expanded = expandedStyle.value,
+                        onDismissRequest = { expandedStyle.value = false },
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    ) {
+                        viewModel.styles.forEach { style ->
+                            DropdownMenuItem(
+                                text = { Text(style) },
+                                onClick = {
+                                    viewModel.setStyle(style)
+                                    expandedStyle.value = false
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                Text(
+                    text = "The app will create a randomized training session with distances between ${minDistance}-${maxDistance}m and up to ${maxPuttsPerDistance} putts per distance.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                Button(
+                    onClick = { 
+                        android.util.Log.d("TrainingSetup", "Start Training Run button clicked")
+                        val trainingRun = viewModel.createTrainingRun()
+                        android.util.Log.d("TrainingSetup", "Created training run: $trainingRun")
+                        onStartTraining(trainingRun)
+                    },
+                    enabled = minDistance <= maxDistance,
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    Text("Start Training Run")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TrainingSessionScreen(viewModel: SessionViewModel, onComplete: () -> Unit, navController: androidx.navigation.NavHostController) {
+    val currentTrainingRun by viewModel.currentTrainingRun.collectAsState()
+    val currentStepIndex by viewModel.currentStepIndex.collectAsState()
+    val trainingSteps by viewModel.trainingSteps.collectAsState()
+    val currentStep by viewModel.currentStep.collectAsState()
+    val progress by viewModel.trainingProgress.collectAsState()
+    val context = LocalContext.current
+    val soundOn by viewModel.soundOn.collectAsState()
+
+    // Debug logging
+    LaunchedEffect(currentTrainingRun, currentStep) {
+        android.util.Log.d("TrainingSession", "Training run: $currentTrainingRun")
+        android.util.Log.d("TrainingSession", "Current step: $currentStep")
+        android.util.Log.d("TrainingSession", "Training steps: ${trainingSteps.size}")
+    }
+
+    // Intercept system back and go to main menu
+    BackHandler {
+        navController.popBackStack("main_menu", inclusive = false)
+        navController.navigate("main_menu")
+    }
+
+    if (currentTrainingRun == null || currentStep == null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("No training run in progress")
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Training run: $currentTrainingRun")
+                Text("Current step: $currentStep")
+                Text("Training steps: ${trainingSteps.size}")
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        android.util.Log.d("TrainingSession", "Manual check - Training run: $currentTrainingRun")
+                        android.util.Log.d("TrainingSession", "Manual check - Current step: $currentStep")
+                        android.util.Log.d("TrainingSession", "Manual check - Training steps: ${trainingSteps.size}")
+                    }
+                ) {
+                    Text("Check State")
+                }
+            }
+        }
+        return
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        MaterialTheme.colorScheme.surface
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            shape = RoundedCornerShape(32.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(0.95f)
+                .wrapContentHeight()
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(32.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Training Run",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    textAlign = TextAlign.Center
+                )
+
+                // Progress indicator
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .padding(bottom = 16.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Text(
+                    text = "${(progress * 100).toInt()}% Complete",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Current step info
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Step ${currentStepIndex + 1} of ${trainingSteps.size}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = "${currentStep!!.distance}m",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = "${currentStep!!.completedPutts}/${currentStep!!.numPutts} putts completed",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        if (currentStep!!.completedPutts > 0) {
+                            val stepHitRate = if (currentStep!!.completedPutts > 0) {
+                                (currentStep!!.madePutts * 100 / currentStep!!.completedPutts)
+                            } else 0
+                            Text(
+                                text = "Step hit rate: $stepHitRate%",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+
+                // Overall stats
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Overall Progress",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            text = "${currentTrainingRun!!.completedPutts}/${currentTrainingRun!!.totalPutts} putts",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        if (currentTrainingRun!!.completedPutts > 0) {
+                            val overallHitRate = (currentTrainingRun!!.madePutts * 100 / currentTrainingRun!!.completedPutts)
+                            Text(
+                                text = "Overall hit rate: $overallHitRate%",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Putt buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.recordTrainingPutt(false)
+                        },
+                        enabled = !currentTrainingRun!!.isCompleted,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.weight(1f).padding(end = 8.dp)
+                    ) {
+                        Text("Missed")
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.recordTrainingPutt(true)
+                        },
+                        enabled = !currentTrainingRun!!.isCompleted,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.weight(1f).padding(start = 8.dp)
+                    ) {
+                        Text("Made")
+                    }
+                }
+
+                if (currentTrainingRun!!.isCompleted) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Training Run Complete!",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    val finalHitRate = if (currentTrainingRun!!.completedPutts > 0) {
+                        (currentTrainingRun!!.madePutts * 100 / currentTrainingRun!!.completedPutts)
+                    } else 0
+                    Text(
+                        text = "Final hit rate: $finalHitRate%",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = {
+                            // Save the training run and close
+                            viewModel.saveTrainingRun(currentTrainingRun!!)
+                            onComplete()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        modifier = Modifier.fillMaxWidth(0.7f)
+                    ) {
+                        Text("Save Session & Close")
+                    }
                 }
             }
         }
