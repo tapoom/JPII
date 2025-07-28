@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [PuttSession::class, TrainingRun::class], version = 2)
+@Database(entities = [PuttSession::class, TrainingRun::class], version = 3)
 abstract class PuttDatabase : RoomDatabase() {
     abstract fun puttSessionDao(): PuttSessionDao
 
@@ -36,6 +36,14 @@ abstract class PuttDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 2 to 3: Add trackingMode field
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Add trackingMode column to training_runs table
+                database.execSQL("ALTER TABLE `training_runs` ADD COLUMN `trackingMode` TEXT NOT NULL DEFAULT 'Per Putt'")
+            }
+        }
+
         fun getDatabase(context: Context): PuttDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -43,7 +51,7 @@ abstract class PuttDatabase : RoomDatabase() {
                     PuttDatabase::class.java,
                     "putt_database"
                 )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 INSTANCE = instance
                 instance

@@ -55,6 +55,11 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val _maxPuttsPerDistance = MutableStateFlow(10)
     val maxPuttsPerDistance: StateFlow<Int> = _maxPuttsPerDistance.asStateFlow()
 
+    // Tracking mode state
+    private val _trackingMode = MutableStateFlow("Per Putt")
+    val trackingMode: StateFlow<String> = _trackingMode.asStateFlow()
+    fun setTrackingMode(mode: String) { _trackingMode.value = mode }
+
     val styles = listOf(
         "Push Putt (Spin-Push Hybrid)",
         "Spin Putt",
@@ -146,7 +151,8 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             maxDistance = maxDist,
             maxPuttsPerDistance = maxPutts,
             totalPutts = totalPutts,
-            style = _selectedStyle.value
+            style = _selectedStyle.value,
+            trackingMode = _trackingMode.value
         )
         
         _currentTrainingRun.value = trainingRun

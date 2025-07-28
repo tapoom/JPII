@@ -65,6 +65,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import klubi.plussipoisid.justputitin.ui.TrendsScreen
+import klubi.plussipoisid.justputitin.ui.MainMenuScreen
+import klubi.plussipoisid.justputitin.ui.TrainingSetupScreen
+import klubi.plussipoisid.justputitin.ui.TrainingSessionScreen
+import klubi.plussipoisid.justputitin.ui.NumberPickerRow
 import android.media.MediaPlayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.core.animateFloatAsState
@@ -75,6 +79,7 @@ import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.withContext
 import klubi.plussipoisid.justputitin.data.TrainingRun
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.RadioButton
 
 @Composable
 fun FadingAppNavHost() {
@@ -1015,6 +1020,42 @@ fun TrainingSetupScreen(viewModel: SessionViewModel, onStartTraining: (TrainingR
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
+                Text("Tracking Mode", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    val trackingMode by viewModel.trackingMode.collectAsState()
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        RadioButton(
+                            selected = trackingMode == "Per Putt",
+                            onClick = { viewModel.setTrackingMode("Per Putt") }
+                        )
+                        Text("Per Putt", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Mark each putt individually",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        RadioButton(
+                            selected = trackingMode == "Per Distance Total",
+                            onClick = { viewModel.setTrackingMode("Per Distance Total") }
+                        )
+                        Text("Per Distance Total", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Enter total made/missed",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
                 Text("Putting Style", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
                 Box {
                     Button(
@@ -1042,8 +1083,9 @@ fun TrainingSetupScreen(viewModel: SessionViewModel, onStartTraining: (TrainingR
                 }
                 
                 Spacer(modifier = Modifier.height(32.dp))
+                val trackingMode by viewModel.trackingMode.collectAsState()
                 Text(
-                    text = "The app will create a randomized training session with distances between ${minDistance}-${maxDistance}m and up to ${maxPuttsPerDistance} putts per distance.",
+                    text = "The app will create a randomized training session with distances between ${minDistance}-${maxDistance}m and up to ${maxPuttsPerDistance} putts per distance. You'll track your putts ${if (trackingMode == "Per Putt") "individually" else "by entering totals for each distance"}.",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -1255,30 +1297,106 @@ fun TrainingSessionScreen(viewModel: SessionViewModel, onComplete: () -> Unit, n
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Putt buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Button(
-                        onClick = {
-                            viewModel.recordTrainingPutt(false)
-                        },
-                        enabled = !currentTrainingRun!!.isCompleted,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.weight(1f).padding(end = 8.dp)
+                // Putt buttons - different UI based on tracking mode
+                val trackingMode = currentTrainingRun!!.trackingMode
+                if (trackingMode == "Per Putt") {
+                    // Individual putt tracking
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Text("Missed")
+                        Button(
+                            onClick = {
+                                viewModel.recordTrainingPutt(false)
+                            },
+                            enabled = !currentTrainingRun!!.isCompleted,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier.weight(1f).padding(end = 8.dp)
+                        ) {
+                            Text("Missed")
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.recordTrainingPutt(true)
+                            },
+                            enabled = !currentTrainingRun!!.isCompleted,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.weight(1f).padding(start = 8.dp)
+                        ) {
+                            Text("Made")
+                        }
                     }
-                    Button(
-                        onClick = {
-                            viewModel.recordTrainingPutt(true)
-                        },
-                        enabled = !currentTrainingRun!!.isCompleted,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        modifier = Modifier.weight(1f).padding(start = 8.dp)
+                } else {
+                    // Per Distance Total tracking - Only Made Putts selection
+                    var madePutts by remember { mutableStateOf<Int?>(0) }
+                    val totalPuttsForStep = currentStep!!.numPutts
+                    val missedPutts = (madePutts ?: 0).let { made -> totalPuttsForStep - made }
+                    
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Made")
+                        Text(
+                            text = "Per Distance Total Mode",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        
+                        Text(
+                            text = "Enter made putts for ${currentStep!!.distance}m (${totalPuttsForStep} total putts)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        
+                        // Made Putts Section
+                        Text("Made Putts", style = MaterialTheme.typography.bodyMedium)
+                        NumberPickerRow(
+                            range = 0..totalPuttsForStep,
+                            selected = madePutts,
+                            onSelected = { madePutts = it }
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Auto-calculated Missed Putts
+                        Text(
+                            text = "Missed Putts: $missedPutts (auto-calculated)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Summary
+                        Text(
+                            text = "Summary: ${madePutts ?: 0} made + $missedPutts missed = ${totalPuttsForStep} total",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        // Complete Step button
+                        Button(
+                            onClick = {
+                                val made = madePutts ?: 0
+                                android.util.Log.d("TrainingSession", "Completing step with $made made, $missedPutts missed")
+                                repeat(made) { viewModel.recordTrainingPutt(true) }
+                                repeat(missedPutts) { viewModel.recordTrainingPutt(false) }
+                                madePutts = 0
+                            },
+                            enabled = !currentTrainingRun!!.isCompleted,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.fillMaxWidth(0.8f)
+                        ) {
+                            Text(
+                                text = "Complete Step",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
