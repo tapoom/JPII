@@ -28,18 +28,9 @@ import androidx.compose.ui.graphics.toArgb
 fun TrendsScreen() {
     val viewModel: SessionViewModel = viewModel()
     val stylesForDistance = viewModel.stylesForDistance.collectAsState().value
-    val sessions = viewModel.sessions.collectAsState().value
-    val historyOptions = listOf("Last week", "Last month", "Last year", "All time")
+    val historyOptions = listOf("Today", "Yesterday", "Past week", "Past month", "All time")
     val expandedRange = remember { mutableStateOf(false) }
-    // Remove distance picker state and effect
-    // val selectedDistance = remember { mutableStateOf<Int?>(null) }
-    // var previousDistance by remember { mutableStateOf<Int?>(null) }
-    // LaunchedEffect(selectedDistance.value) {
-    //     if (selectedDistance.value != null && selectedDistance.value != previousDistance) {
-    //         selectedStyle.value = "All"
-    //         previousDistance = selectedDistance.value
-    //     }
-    // }
+
     val selectedRange = remember { mutableStateOf(historyOptions[0]) }
     val selectedStyle = remember { mutableStateOf("All") }
     val expandedStyle = remember { mutableStateOf(false) }
@@ -73,20 +64,55 @@ fun TrendsScreen() {
     LaunchedEffect(Unit) {
         viewModel.loadAllStyles()
     }
-    LaunchedEffect(selectedRange.value) {
-        // selectedDistance.value?.let { viewModel.loadStylesForDistance(it) } // Removed distance picker
-    }
-    // Only load sessions when all filters are selected
-    LaunchedEffect(selectedRange.value) {
-        // selectedDistance.value?.let { viewModel.loadSessionsForDistanceAndStyle(it, if (selectedStyle.value == "All") null else selectedStyle.value, selectedRange.value) } // Removed distance picker
-        if (selectedRange.value != null) {
-            viewModel.loadSessionsByDateRange(
-                if (customRange.value != null) customRange.value!!.first else 0L,
-                if (customRange.value != null) customRange.value!!.second else System.currentTimeMillis()
-            ) { sessions ->
-                sessionsForRange.value = sessions
-                hitRates.value = viewModel.getHitRatePerDistance(sessions)
+    
+    // Consolidated data loading effect that responds to all filter changes
+    LaunchedEffect(selectedRange.value, selectedStyle.value, customRange.value) {
+        val styleFilter = if (selectedStyle.value == "All") null else selectedStyle.value
+        
+        // Calculate date range based on selected range
+        val (start, end) = when (selectedRange.value) {
+            "Today" -> {
+                val startOfDay = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                startOfDay to System.currentTimeMillis()
             }
+            "Yesterday" -> {
+                val startOfYesterday = Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_YEAR, -1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                val endOfYesterday = Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_YEAR, -1)
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }.timeInMillis
+                startOfYesterday to endOfYesterday
+            }
+            "Past week" -> System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L to System.currentTimeMillis()
+            "Past month" -> System.currentTimeMillis() - 30 * 24 * 60 * 60 * 1000L to System.currentTimeMillis()
+            "Custom range" -> {
+                if (customRange.value != null) {
+                    customRange.value!!.first to customRange.value!!.second
+                } else {
+                    0L to System.currentTimeMillis()
+                }
+            }
+            else -> 0L to System.currentTimeMillis()
+        }
+        
+        viewModel.loadSessionsByDateRange(start, end) { sessions ->
+            val filtered = if (styleFilter == null) sessions else sessions.filter { it.style == styleFilter }
+            sessionsForRange.value = filtered
+            hitRates.value = viewModel.getHitRatePerDistance(filtered)
         }
     }
 
@@ -201,30 +227,7 @@ fun TrendsScreen() {
         }
         Spacer(modifier = Modifier.height(24.dp))
         // Data loading for chart
-        LaunchedEffect(selectedRange.value, customRange.value, selectedStyle.value) {
-            val styleFilter = if (selectedStyle.value == "All") null else selectedStyle.value
-            if (customRange.value != null) {
-                viewModel.loadSessionsByDateRange(customRange.value!!.first, customRange.value!!.second) { sessions ->
-                    val filtered = if (styleFilter == null) sessions else sessions.filter { it.style == styleFilter }
-                    sessionsForRange.value = filtered
-                    hitRates.value = viewModel.getHitRatePerDistance(filtered)
-                }
-            } else {
-                // Use default periods
-                val now = System.currentTimeMillis()
-                val (start, end) = when (selectedRange.value) {
-                    "Last week" -> now - 7 * 24 * 60 * 60 * 1000L to now
-                    "Last month" -> now - 30 * 24 * 60 * 60 * 1000L to now
-                    "Last year" -> now - 365 * 24 * 60 * 60 * 1000L to now
-                    else -> 0L to now
-                }
-                viewModel.loadSessionsByDateRange(start, end) { sessions ->
-                    val filtered = if (styleFilter == null) sessions else sessions.filter { it.style == styleFilter }
-                    sessionsForRange.value = filtered
-                    hitRates.value = viewModel.getHitRatePerDistance(filtered)
-                }
-            }
-        }
+
         if (hitRates.value.isEmpty()) {
             Text("No sessions found for this period.")
         } else if (hitRates.value.isNotEmpty()) {
